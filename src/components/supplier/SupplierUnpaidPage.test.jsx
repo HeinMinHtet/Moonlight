@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { SupplierUnpaidPage } from "./SupplierUnpaidPage.jsx";
@@ -57,7 +57,34 @@ function renderPage(overrides = {}) {
 }
 
 describe("SupplierUnpaidPage", () => {
-  it("exports only filtered verified unpaid rows without a separate batch checkbox", async () => {
+  it("places the batch actions in the summary and removes the page header and filters", () => {
+    renderPage();
+
+    const summaryPanel = screen.getByRole("heading", { name: "Verified unpaid total" }).closest("aside");
+    const recordsWorkspace = screen.getByRole("region", { name: "Supplier records workspace" });
+
+    expect(screen.queryByRole("heading", { name: "Unpaid sales records" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Supplier record filters")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
+    expect(summaryPanel?.nextElementSibling).toBe(recordsWorkspace);
+    expect(within(summaryPanel).getByRole("button", { name: "Export batch PNG" })).toBeInTheDocument();
+    expect(within(summaryPanel).getByRole("button", { name: "Mark batch paid" })).toBeInTheDocument();
+    expect(within(summaryPanel).getByText("2 unpaid")).toBeInTheDocument();
+    expect(within(recordsWorkspace).getByRole("button", { name: "Record sale" })).toBeInTheDocument();
+    expect(within(recordsWorkspace).getByRole("columnheader", { name: "Buyer" })).toBeInTheDocument();
+  });
+
+  it("keeps the summary visible while the grouped records workspace is loading", () => {
+    renderPage({ loading: true });
+
+    const recordsWorkspace = screen.getByRole("region", { name: "Supplier records workspace" });
+
+    expect(screen.getByRole("heading", { name: "Verified unpaid total" })).toBeInTheDocument();
+    expect(within(recordsWorkspace).getByLabelText("Loading unpaid sales records")).toBeInTheDocument();
+    expect(within(recordsWorkspace).queryByRole("button", { name: "Record sale" })).not.toBeInTheDocument();
+  });
+
+  it("exports all verified unpaid rows without a separate batch checkbox", async () => {
     const user = userEvent.setup();
     const { onExport } = renderPage();
 
@@ -68,5 +95,23 @@ describe("SupplierUnpaidPage", () => {
 
     expect(onExport).toHaveBeenCalledOnce();
     expect(onExport.mock.calls[0][0]).toEqual([verifiedRecord]);
+  });
+
+  it("uses checkbox-only verification controls without status badges", async () => {
+    const user = userEvent.setup();
+    const { onPatchRecord } = renderPage();
+    const verifiedRow = screen.getByText("Verifiedbuyer").closest("tr");
+    const reviewRow = screen.getByText("Reviewbuyer").closest("tr");
+    const verifiedCheckbox = within(verifiedRow).getByRole("checkbox", { name: "Mark Verifiedbuyer verified" });
+    const reviewCheckbox = within(reviewRow).getByRole("checkbox", { name: "Mark Reviewbuyer verified" });
+
+    expect(verifiedCheckbox).toBeChecked();
+    expect(reviewCheckbox).not.toBeChecked();
+    expect(within(verifiedRow).queryByText("Verified", { exact: true })).not.toBeInTheDocument();
+    expect(within(reviewRow).queryByText("Review", { exact: true })).not.toBeInTheDocument();
+
+    await user.click(reviewCheckbox);
+
+    expect(onPatchRecord).toHaveBeenCalledWith("review-row", { correct: true });
   });
 });

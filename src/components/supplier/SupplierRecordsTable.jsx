@@ -7,7 +7,6 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table/DataTable.jsx";
 import { DataTableColumnHeader } from "@/components/data-table/DataTableColumnHeader.jsx";
-import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -15,6 +14,11 @@ import { NativeSelect } from "@/components/ui/native-select.jsx";
 import { cn } from "@/lib/utils.js";
 import { dateOnly, money } from "../../utils/format.js";
 import { withCurrent } from "../../utils/options.js";
+
+const centeredHeader = "mx-auto justify-center text-center";
+const centeredCell = "text-center";
+const numericCell = "text-center font-mono tabular-nums";
+const actionCell = "text-center";
 
 export function SupplierRecordsTable({
   records,
@@ -52,94 +56,93 @@ export function SupplierRecordsTable({
       header: "#",
       enableSorting: false,
       enableHiding: false,
-      cell: ({ row }) => row.index + 1,
-      meta: { headClassName: "w-12", cellClassName: "w-12 text-muted-foreground" }
+      cell: ({ row }) => <span className="font-mono tabular-nums">{row.index + 1}</span>,
+      meta: { headClassName: "w-12 text-center", cellClassName: "w-12 text-center text-muted-foreground" }
     },
     {
       accessorKey: "date",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field w-32" type="date" value={draft.date || ""} onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))} />
-        : dateOnly(getValue()),
-      meta: { label: "Date" }
+        ? <Input className="table-edit-field mx-auto w-32 text-center" type="date" value={draft.date || ""} onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))} />
+        : <span className="font-mono tabular-nums">{dateOnly(getValue())}</span>,
+      meta: { label: "Date", headClassName: "w-36 text-center", cellClassName: "w-36 text-center" }
     },
     {
       accessorKey: "buyerName",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Buyer" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Buyer" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field w-40" value={draft.buyerName || ""} onChange={(event) => setDraft((current) => ({ ...current, buyerName: event.target.value }))} />
+        ? <Input className="table-edit-field mx-auto w-40 text-center" value={draft.buyerName || ""} onChange={(event) => setDraft((current) => ({ ...current, buyerName: event.target.value }))} />
         : getValue(),
-      meta: { label: "Buyer" }
+      meta: { label: "Buyer", headClassName: centeredCell, cellClassName: centeredCell }
     },
     {
       accessorKey: "serviceType",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Service" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Service" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing) ? (
-        <NativeSelect className="table-edit-field w-40" value={draft.serviceType || ""} onChange={(event) => setDraft((current) => ({ ...current, serviceType: event.target.value }))}>
+        <NativeSelect className="table-edit-field mx-auto w-40 text-center" value={draft.serviceType || ""} onChange={(event) => setDraft((current) => ({ ...current, serviceType: event.target.value }))}>
           {withCurrent(services.map((service) => service.type), row.original.serviceType).map((value) => <option key={value} value={value}>{value}</option>)}
         </NativeSelect>
       ) : getValue(),
-      meta: { label: "Service" }
+      meta: { label: "Service", headClassName: centeredCell, cellClassName: centeredCell }
     },
     {
       accessorKey: "quantity",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Qty" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Qty" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field w-24" type="number" min="0" step="0.1" value={draft.quantity ?? 1} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} />
-        : getValue(),
-      meta: { label: "Quantity" }
+        ? <Input className="table-edit-field mx-auto w-24 text-center font-mono tabular-nums" type="number" min="0" step="0.1" value={draft.quantity ?? 1} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} />
+        : <span className="font-mono tabular-nums">{getValue()}</span>,
+      meta: { label: "Quantity", headClassName: "w-24 text-center", cellClassName: numericCell }
     },
     {
       accessorKey: "rateAtRecord",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Saved rate" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Saved rate" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field w-28" type="number" min="0" step="0.01" value={draft.rateAtRecord ?? 0} onChange={(event) => setDraft((current) => ({ ...current, rateAtRecord: event.target.value }))} />
-        : money(getValue()),
+        ? <Input className="table-edit-field mx-auto w-28 text-center font-mono tabular-nums" type="number" min="0" step="0.01" value={draft.rateAtRecord ?? 0} onChange={(event) => setDraft((current) => ({ ...current, rateAtRecord: event.target.value }))} />
+        : <span className="font-mono tabular-nums">{money(getValue())}</span>,
       sortingFn: "basic",
-      meta: { label: "Saved rate" }
+      meta: { label: "Saved rate", headClassName: "w-32 text-center", cellClassName: numericCell }
     },
     {
       accessorKey: "armorType",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Armor stack" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Armor stack" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing) ? (
-        <NativeSelect className="table-edit-field w-36" value={draft.armorType || ""} onChange={(event) => setDraft((current) => ({ ...current, armorType: event.target.value }))}>
+        <NativeSelect className="table-edit-field mx-auto w-36 text-center" value={draft.armorType || ""} onChange={(event) => setDraft((current) => ({ ...current, armorType: event.target.value }))}>
           {withCurrent(armorTypes, row.original.armorType).map((value) => <option key={value} value={value}>{value}</option>)}
         </NativeSelect>
       ) : getValue(),
-      meta: { label: "Armor stack" }
+      meta: { label: "Armor stack", headClassName: centeredCell, cellClassName: centeredCell }
     },
     {
       accessorKey: "correct",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Verified" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Verified" className={centeredHeader} />,
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {permissions.canEditSupplierStatus && (
-            <Checkbox
-              checked={Boolean(row.original.correct)}
-              onCheckedChange={(checked) => onPatchRecord(row.original.id, { correct: Boolean(checked) })}
-              aria-label={`Mark ${row.original.buyerName || row.original.serviceType} verified`}
-            />
-          )}
-          <Badge variant={row.original.correct ? "success" : "warning"}>{row.original.correct ? "Verified" : "Review"}</Badge>
+        <div className="flex min-h-11 items-center justify-center">
+          <Checkbox
+            className="size-6 rounded-md border-2 border-muted-foreground/50 bg-muted/40 transition-colors hover:border-primary hover:bg-primary/10 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+            checked={Boolean(row.original.correct)}
+            disabled={!permissions.canEditSupplierStatus}
+            onCheckedChange={(checked) => onPatchRecord(row.original.id, { correct: Boolean(checked) })}
+            aria-label={`Mark ${row.original.buyerName || row.original.serviceType} verified`}
+          />
         </div>
       ),
       sortingFn: "basic",
-      meta: { label: "Verified" }
+      meta: { label: "Verified", headClassName: "w-28 text-center", cellClassName: "w-28 text-center" }
     },
     {
       accessorKey: "totalCost",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
-      cell: ({ getValue }) => <strong>{money(getValue())}</strong>,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" className={centeredHeader} />,
+      cell: ({ getValue }) => <strong className="font-mono tabular-nums">{money(getValue())}</strong>,
       sortingFn: "basic",
-      meta: { label: "Amount" }
+      meta: { label: "Amount", headClassName: "w-36 text-center", cellClassName: numericCell }
     },
     {
       accessorKey: "note",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Note" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Note" className={centeredHeader} />,
       cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field w-48" value={draft.note || ""} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} />
-        : <span className="block max-w-60 truncate" title={getValue() || ""}>{getValue() || "—"}</span>,
-      meta: { label: "Note" }
+        ? <Input className="table-edit-field mx-auto w-48 text-center" value={draft.note || ""} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} />
+        : <span className="mx-auto block max-w-60 truncate text-center" title={getValue() || ""}>{getValue() || "—"}</span>,
+      meta: { label: "Note", headClassName: centeredCell, cellClassName: centeredCell }
     },
     {
       id: "actions",
@@ -147,16 +150,17 @@ export function SupplierRecordsTable({
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => isEditing(row.original, editing) ? (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <Button size="sm" onClick={() => onPatchRecord(row.original.id, draft)}>Save</Button>
           <Button variant="outline" size="sm" onClick={() => onSetEditing(null)}>Cancel</Button>
         </div>
       ) : (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           {permissions.canUseSupplier && <Button variant="outline" size="sm" onClick={() => onSetEditing({ scope: "supplier", id: row.original.id })}>Edit</Button>}
           {permissions.canDeleteSupplierRows && <Button variant="destructive" size="sm" onClick={() => onDeleteRecord(row.original)}>Delete</Button>}
         </div>
-      )
+      ),
+      meta: { headClassName: "w-40 text-center", cellClassName: actionCell }
     }
   ], [armorTypes, draft, editing, onDeleteRecord, onPatchRecord, onSetEditing, permissions, services]);
 

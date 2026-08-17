@@ -4,15 +4,18 @@ import { money } from "../../utils/format.js";
 import { Card } from "@/components/ui/card.jsx";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table.jsx";
 
-export function SupplierSummary({ rows, grandTotal }) {
+export function SupplierSummary({ rows, grandTotal, embedded = false, children }) {
   return (
-    <Card asChild><aside className="summary-panel">
+    <Card asChild><aside className={`summary-panel${embedded ? " rounded-none border-x-0 shadow-none" : ""}`}>
       <div className="section-head">
         <div>
           <h2>Verified unpaid total</h2>
           <p className="panel-note">Only verified unpaid sales records are counted.</p>
         </div>
-        <span>{money(grandTotal)}</span>
+        <div className="section-actions">
+          <span>{money(grandTotal)}</span>
+          {children}
+        </div>
       </div>
       <Table className="summary-table">
         <TableHeader>
