@@ -1,0 +1,101 @@
+{
+  "supplierServices": [
+    {
+      "type": "m10",
+      "price": 140,
+      "active": true
+    },
+    {
+      "type": "Raid unsaved",
+      "price": 950,
+      "active": true
+    }
+  ],
+  "boosterPrices": [
+    {
+      "level": "m10",
+      "price": 95,
+      "active": true
+    },
+    {
+      "level": "m12",
+      "price": 130,
+      "active": true
+    }
+  ],
+  "armorTypes": [
+    "Mail",
+    "Cloth",
+    "Leather",
+    "Plate",
+    "No stack"
+  ],
+  "supplierRecords": [
+    {
+      "id": "example-supplier-unpaid-001",
+      "date": "2026-01-15",
+      "buyerName": "ExampleBuyer",
+      "serviceType": "m10",
+      "quantity": 2,
+      "armorType": "Plate",
+      "correct": true,
+      "paid": false,
+      "note": "Example unpaid supplier sale",
+      "rateAtRecord": 140,
+      "totalCost": 280,
+      "createdByDiscordId": "example-admin-discord-id",
+      "createdByName": "ExampleAdmin",
+      "createdAt": "2026-01-15T10:00:00.000Z"
+    },
+    {
+      "id": "example-supplier-paid-001",
+      "date": "2026-01-14",
+      "buyerName": "SampleCustomer",
+      "serviceType": "Raid unsaved",
+      "quantity": 1,
+      "armorType": "No stack",
+      "correct": true,
+      "paid": true,
+      "note": "Example paid supplier sale",
+      "rateAtRecord": 950,
+      "totalCost": 950,
+      "createdByDiscordId": "example-admin-discord-id",
+      "createdByName": "ExampleAdmin",
+      "createdAt": "2026-01-14T10:00:00.000Z",
+      "paidAt": "2026-01-16T10:00:00.000Z",
+      "paidByDiscordId": "example-admin-discord-id",
+      "paidByName": "ExampleAdmin",
+      "paymentBatchId": "spb_example_batch_001"
+    }
+  ],
+  "boosterRecords": [
+    {
+      "id": "example-booster-unpaid-001",
+      "discordId": "example-booster-discord-id",
+      "boosterName": "ExampleBooster",
+      "level": "m10",
+      "quantity": 3,
+      "note": "Example unpaid booster payout",
+      "paid": false,
+      "rateAtRecord": 95,
+      "totalBalance": 285,
+      "createdAt": "2026-01-15T11:00:00.000Z"
+    },
+    {
+      "id": "example-booster-paid-001",
+      "discordId": "sample-booster-discord-id",
+      "boosterName": "SampleBooster",
+      "level": "m12",
+      "quantity": 2,
+      "note": "Example paid booster payout",
+      "paid": true,
+      "rateAtRecord": 130,
+      "totalBalance": 260,
+      "createdAt": "2026-01-14T11:00:00.000Z",
+      "paidAt": "2026-01-16T11:00:00.000Z",
+      "paidByDiscordId": "example-admin-discord-id",
+      "paidByName": "ExampleAdmin",
+      "boosterPaymentBatchId": "bpb_example_batch_001"
+    }
+  ]
+}
