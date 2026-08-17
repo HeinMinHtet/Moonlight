@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Moonlight WoW Payout Ledger</title>
+    <meta name="description" content="Admin sales tracking, supplier amounts due, and booster payout records for WoW services.">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <section class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div class="brand-copy">
+            <p class="eyebrow">Moonlight WoW operations</p>
+            <h1>Moonlight Ledger</h1>
+          </div>
+        </section>
+        <section class="session">
+          <span id="sessionStatus">Checking access...</span>
+          <button id="logoutButton" class="ghost hidden" type="button">Log out</button>
+        </section>
+      </header>
+
+      <section class="access-grid">
+        <section id="accessPanel" class="access-panel">
+          <div class="access-copy-block">
+            <p class="access-title">Discord access</p>
+            <p id="accessHint" class="access-copy">Use your Discord role to open the right workspace.</p>
+          </div>
+          <div class="access-meta" aria-label="Current access">
+            <span id="roleBadge" class="role-badge guest">Guest</span>
+            <ul id="permissionList" class="permission-list"></ul>
+          </div>
+          <a id="discordLogin" class="discord-button" href="/auth/discord">Sign in with Discord</a>
+        </section>
+      </section>
+
+      <nav class="tabs" aria-label="Ledger sections">
+        <button class="tab active" type="button" data-tab="supplier">Sales ledger</button>
+        <button class="tab" type="button" data-tab="supplierHistory">Paid history</button>
+        <button class="tab" type="button" data-tab="booster">Booster payouts</button>
+        <button class="tab" type="button" data-tab="prices">Rate settings</button>
+      </nav>
+
+      <section id="supplierTab" class="tab-panel active">
+        <section class="sheet-layout">
+          <article class="sheet-main">
+            <div class="section-head">
+              <div>
+                <h2>Unpaid sales records</h2>
+                <p id="supplierAccessNote" class="panel-note">Admins record buyer orders, verify rows, then mark the paid batch complete.</p>
+              </div>
+              <div class="section-actions">
+                <button id="exportSupplierButton" class="ghost" type="button">Export verified PNG</button>
+                <button id="markSupplierPaidButton" type="button">Mark verified paid</button>
+                <span id="supplierCount">0 rows</span>
+              </div>
+            </div>
+            <form id="supplierRecordForm" class="entry-grid">
+              <label>Date <input name="date" type="date"></label>
+              <label>Buyer character <input name="buyerName" placeholder="Character name"></label>
+              <label>Service <select name="serviceType"></select></label>
+              <label>Qty <input name="quantity" type="number" min="0" step="0.1" value="1"></label>
+              <label>Armor stack <select name="armorType"></select></label>
+              <label>Note <input name="note" placeholder="Optional note"></label>
+              <button type="submit">Record sale</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Buyer</th>
+                    <th>Service</th>
+                    <th>Qty</th>
+                    <th>Saved rate</th>
+                    <th>Armor stack</th>
+                    <th>Verified</th>
+                    <th>Amount</th>
+                    <th>Note</th>
+                    <th>Manage</th>
+                  </tr>
+                </thead>
+                <tbody id="supplierRows"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside class="summary-panel">
+            <div class="section-head">
+              <div>
+                <h2>Verified unpaid total</h2>
+                <p class="panel-note">Only verified unpaid sales records are counted.</p>
+              </div>
+              <span id="supplierTotal">0</span>
+            </div>
+            <table class="summary-table">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Total qty</th>
+                  <th>Rate</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody id="summaryRows"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3">Verified unpaid total</td>
+                  <td id="summaryGrandTotal">0</td>
+                </tr>
+              </tfoot>
+            </table>
+          </aside>
+        </section>
+      </section>
+
+      <section id="supplierHistoryTab" class="tab-panel">
+        <article class="sheet-main">
+          <div class="section-head">
+            <div>
+              <h2>Paid supplier history</h2>
+              <p class="panel-note">Completed supplier payments are archived here after confirmation.</p>
+            </div>
+            <span id="supplierHistoryCount">0 paid</span>
+          </div>
+          <div class="table-wrap">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Paid date</th>
+                  <th>Sale date</th>
+                  <th>Buyer</th>
+                  <th>Service</th>
+                  <th>Qty</th>
+                  <th>Saved rate</th>
+                  <th>Amount</th>
+                  <th>Paid by</th>
+                </tr>
+              </thead>
+              <tbody id="supplierHistoryRows"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="boosterTab" class="tab-panel">
+        <section class="booster-layout">
+          <article class="sheet-main">
+            <div class="section-head">
+              <div>
+                <h2>Mythic+ payout entries</h2>
+                <p id="boosterAccessNote" class="panel-note">Record completed runs so your payout stays up to date.</p>
+              </div>
+              <span id="boosterCount">0 records</span>
+            </div>
+            <form id="boosterRecordForm" class="entry-grid booster-entry">
+              <label>Mythic+ key <select name="level"></select></label>
+              <label>Runs completed <input name="quantity" type="number" min="1" step="1" value="1"></label>
+              <label>Note <input name="note" placeholder="Optional run note"></label>
+              <button type="submit">Record run</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Booster</th>
+                    <th>Key level</th>
+                    <th>Runs</th>
+                    <th>Saved rate</th>
+                    <th>Payout</th>
+                    <th>Payment</th>
+                    <th>Note</th>
+                    <th>Manage</th>
+                  </tr>
+                </thead>
+                <tbody id="boosterRows"></tbody>
+              </table>
+            </div>
+          </article>
+          <aside class="summary-panel">
+            <h2>Unpaid booster payout</h2>
+            <p class="big-number" id="boosterOpenTotal">0</p>
+            <p id="boosterScopeNote" class="muted">Admins see every booster. Boosters see only their own unpaid payout.</p>
+            <div id="boosterSummaryRows" class="balance-list"></div>
+          </aside>
+        </section>
+      </section>
+
+      <section id="pricesTab" class="tab-panel">
+        <section class="price-grid">
+          <form id="supplierPriceForm" class="price-panel">
+            <div class="section-head">
+              <div>
+                <h2>Supplier rates</h2>
+                <p id="pricesAccessNote" class="panel-note">Default rates for new sales records. Existing rows keep their saved rate.</p>
+              </div>
+              <button type="button" data-add-price="supplier">Add service</button>
+            </div>
+            <div id="supplierPriceRows" class="price-rows"></div>
+            <button type="submit">Save supplier rates</button>
+          </form>
+
+          <form id="boosterPriceForm" class="price-panel">
+            <div class="section-head">
+              <div>
+                <h2>Booster payout rates</h2>
+                <p class="panel-note">Default payout rates for new booster rows. Existing rows keep their saved rate.</p>
+              </div>
+              <button type="button" data-add-price="booster">Add key level</button>
+            </div>
+            <div id="boosterPriceRows" class="price-rows"></div>
+            <button type="submit">Save booster rates</button>
+          </form>
+        </section>
+      </section>
+
+      <p id="toast" class="toast hidden" role="status"></p>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,209 @@
+@layer theme, base, legacy, components, utilities;
+@import url("/styles.css") layer(legacy);
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius-ui) - 4px);
+  --radius-md: calc(var(--radius-ui) - 2px);
+  --radius-lg: var(--radius-ui);
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  --background: #07121d;
+  --foreground: #e6eef3;
+  --card: #0e1c29;
+  --card-foreground: #e6eef3;
+  --popover: #112332;
+  --popover-foreground: #e6eef3;
+  --primary: #8db3cd;
+  --primary-foreground: #07131d;
+  --secondary: #162a39;
+  --secondary-foreground: #d6e2e8;
+  --muted: #132531;
+  --muted-foreground: #9caeba;
+  --accent: #b2d0df;
+  --accent-foreground: #07131d;
+  --destructive: #a94d5d;
+  --success: #78a99a;
+  --success-foreground: #a9d6c8;
+  --warning: #b99a68;
+  --warning-foreground: #e1c692;
+  --border: #294252;
+  --input: #365569;
+  --ring: #b5d8eb;
+  --radius-ui: 0.75rem;
+  --shadow-soft: 0 18px 50px rgb(1 8 14 / 0.24);
+  --shadow-raised: 0 12px 32px rgb(1 8 14 / 0.3);
+  --motion-fast: 150ms;
+  --motion-standard: 220ms;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-width: 320px;
+    overflow-x: clip;
+    line-height: 1.55;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 32%, transparent);
+    color: var(--foreground);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .skip-link {
+    @apply sr-only;
+  }
+
+  .skip-link:focus {
+    @apply not-sr-only fixed left-4 top-4 z-50 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  .ui-page-state {
+    @apply m-4 flex min-h-36 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 px-6 py-8 text-center;
+  }
+
+  .ui-page-state-title {
+    @apply text-sm font-semibold text-foreground;
+  }
+
+  .ui-page-state-description {
+    @apply mt-1 max-w-xl text-sm text-muted-foreground;
+  }
+
+  .data-table-shell {
+    @apply min-w-0 overflow-hidden border-y border-border bg-card;
+  }
+
+  .data-table-scroll {
+    @apply max-h-[min(68vh,760px)] w-full max-w-full overflow-auto overscroll-contain;
+  }
+
+  .data-table-empty-message {
+    @apply sticky left-0 flex h-28 items-center justify-center px-4 text-center text-sm font-medium text-muted-foreground;
+    width: min(100%, calc(100vw - 2.75rem));
+  }
+
+  .data-table-toolbar {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-3;
+  }
+
+  .data-table-toolbar-copy {
+    @apply text-xs font-medium text-muted-foreground;
+  }
+
+  .data-table-pagination {
+    @apply flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3;
+  }
+
+  .data-table-pagination-copy {
+    @apply text-xs font-medium text-muted-foreground;
+  }
+
+  .data-table-header-button {
+    @apply -ml-2 inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-left text-xs font-semibold uppercase tracking-wide text-current hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .table-edit-field {
+    @apply h-8 min-w-24 bg-popover px-2 text-xs;
+  }
+
+  .status-row-review {
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+  }
+
+  .status-row-paid {
+    background: color-mix(in srgb, var(--success) 10%, transparent);
+  }
+
+  .status-row-selected {
+    background: color-mix(in srgb, var(--primary) 13%, transparent);
+    box-shadow: inset 4px 0 0 var(--primary);
+  }
+
+  .status-row-editing {
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    box-shadow: inset 4px 0 0 var(--warning);
+  }
+
+  .ledger-navigation {
+    @apply my-5 min-w-0;
+  }
+
+  .ledger-navigation-list {
+    @apply grid w-full min-w-0 grid-cols-2 gap-2 border border-border bg-card/85 p-2 text-muted-foreground shadow-lg sm:grid-cols-3 lg:grid-cols-5;
+  }
+
+  .ledger-navigation-item {
+    @apply min-w-0 whitespace-normal px-2 text-center leading-tight;
+  }
+
+  .ledger-navigation-item > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .ledger-navigation-item:only-child {
+    @apply col-span-2 sm:col-span-1;
+  }
+}
+
+@media (max-width: 374px) {
+  .ledger-navigation-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-navigation-item:only-child {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
