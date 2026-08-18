@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.jsx";
+import { cn } from "@/lib/utils.js";
 
 const currentDate = today();
 const currentMonth = currentDate.slice(0, 7);
@@ -83,9 +84,21 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
         </section>
 
         <section className="batch-bar profit-stat-bar" aria-label="Profit totals">
-          <div><span className="batch-label">Supplier paid</span><strong>{money(totals.supplierPaidTotal)}</strong><small>{totals.supplierRecordCount} sales rows</small></div>
-          <div><span className="batch-label">Booster payouts</span><strong>{money(totals.boosterPayoutTotal)}</strong><small>{totals.boosterRecordCount} payout rows</small></div>
-          <div className={netTone}><span className="batch-label">Net profit</span><strong>{money(totals.netProfit)}</strong><small>Supplier paid minus booster paid</small></div>
+          <div className="border-t-2 border-t-emerald-500/80">
+            <span className="batch-label">Supplier paid</span>
+            <strong className="text-emerald-300">{money(totals.supplierPaidTotal)}</strong>
+            <small>{totals.supplierRecordCount} sales rows</small>
+          </div>
+          <div className="border-t-2 border-t-sky-400/80">
+            <span className="batch-label">Booster payouts</span>
+            <strong className="text-sky-300">{money(totals.boosterPayoutTotal)}</strong>
+            <small>{totals.boosterRecordCount} payout rows</small>
+          </div>
+          <div className={cn(netTone, totals.netProfit < 0 ? "border-t-2 border-t-rose-500/80" : "border-t-2 border-t-emerald-500/80")}>
+            <span className="batch-label">Net profit</span>
+            <strong className={totals.netProfit < 0 ? "text-rose-300" : "text-emerald-300"}>{money(totals.netProfit)}</strong>
+            <small>Supplier paid minus booster paid</small>
+          </div>
         </section>
 
         {loading && !report && <div className="space-y-2 p-4" aria-label="Loading profit report"><Skeleton className="h-10 w-full" /><Skeleton className="h-28 w-full" /></div>}

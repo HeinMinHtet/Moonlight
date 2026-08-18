@@ -25,14 +25,14 @@ export function AuthPanel({ user, role, isAdmin, discordConfigured, discordOAuth
   const loginDisabled = Boolean(user || !discordConfigured);
 
   return (
-    <Card className="mb-4 border-t-4 border-t-blue-400">
+    <Card className="mb-4 border-t-2 border-t-primary/80">
       <CardContent className="flex flex-col items-start gap-4 p-4 lg:flex-row lg:items-center">
         <div className="min-w-56 flex-1">
           <p className="text-xs font-extrabold uppercase tracking-wider text-primary">Discord access</p>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{hint}</p>
         </div>
         <div className="flex flex-1 flex-wrap items-center gap-2" aria-label="Current access">
-          <Badge variant={isAdmin ? "admin" : role === "booster" ? "info" : "neutral"}>
+          <Badge variant={isAdmin ? "admin" : role === "booster" ? "booster" : "neutral"}>
             {user ? (isAdmin ? "Admin" : "Booster") : "Guest"}
           </Badge>
           <ul className="flex flex-wrap gap-1.5">

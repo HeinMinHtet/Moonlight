@@ -6,8 +6,8 @@ export function Alert({ className, variant = "default", ...props }) {
     <div
       role="alert"
       className={cn(
-        "relative rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-sm",
-        variant === "destructive" && "border-destructive/60 bg-destructive/15 text-foreground",
+        "relative rounded-2xl border border-border/80 bg-card/90 px-5 py-4 text-sm shadow-md backdrop-blur-md",
+        variant === "destructive" && "border-destructive/50 bg-destructive/15 text-rose-200",
         className
       )}
       {...props}

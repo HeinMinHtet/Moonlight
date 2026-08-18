@@ -12,7 +12,7 @@ export function DataTablePagination({ table }) {
       <div className="flex items-center gap-2">
         <span className="data-table-pagination-copy">Rows per page</span>
         <NativeSelect
-          className="h-8 w-20"
+          className="h-8 min-h-0 w-20 rounded-lg px-2 py-0 text-xs"
           value={String(table.getState().pagination.pageSize)}
           onChange={(event) => table.setPageSize(Number(event.target.value))}
           aria-label="Rows per page"

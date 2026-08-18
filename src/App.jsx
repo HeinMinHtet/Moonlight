@@ -10,6 +10,7 @@ import { SupplierUnpaidPage } from "./components/supplier/SupplierUnpaidPage.jsx
 import { money } from "./utils/format.js";
 import { exportSupplierReport } from "./utils/exportSupplierReport.js";
 import { buildSupplierSummary, supplierBatchWarnings } from "./utils/supplierBatch.js";
+import { Badge } from "@/components/ui/badge.jsx";
 import { Button, buttonVariants } from "@/components/ui/button.jsx";
 import { Toaster } from "@/components/ui/sonner.jsx";
 import { cn } from "@/lib/utils.js";
@@ -480,7 +481,7 @@ export function App() {
         <section className="session" aria-label="Discord account">
           {data.user ? (
             <div className="session-identity">
-              <span className="session-role">{isAdmin ? "Admin" : "Booster"}</span>
+              <Badge variant={isAdmin ? "admin" : "booster"}>{isAdmin ? "Admin" : "Booster"}</Badge>
               <strong className="session-user">{data.user.username || "Discord user"}</strong>
               <Button variant="ghost" size="sm" type="button" onClick={logout}>Log out</Button>
             </div>

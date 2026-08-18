@@ -18,20 +18,20 @@ export function TableFooter({ className, ...props }) {
 }
 
 export function TableRow({ className, ...props }) {
-  return <tr className={cn("border-b transition-colors hover:bg-muted/45 data-[state=selected]:bg-primary/10", className)} {...props} />;
+  return <tr className={cn("border-b border-border/60 transition-colors hover:bg-primary/[0.04] data-[state=selected]:bg-primary/12", className)} {...props} />;
 }
 
 export function TableHead({ className, ...props }) {
   return (
     <th
-      className={cn("sticky top-0 z-10 h-11 whitespace-nowrap bg-background/95 px-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm", className)}
+      className={cn("sticky top-0 z-10 h-11 whitespace-nowrap border-b border-border bg-card/95 px-3 text-left align-middle text-xs font-bold uppercase tracking-wider text-muted-foreground backdrop-blur-md", className)}
       {...props}
     />
   );
 }
 
 export function TableCell({ className, ...props }) {
-  return <td className={cn("whitespace-nowrap px-3 py-2 align-middle", className)} {...props} />;
+  return <td className={cn("whitespace-nowrap px-3 py-2.5 align-middle text-sm text-foreground/90", className)} {...props} />;
 }
 
 export function TableCaption({ className, ...props }) {

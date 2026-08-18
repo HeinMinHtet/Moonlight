@@ -46,7 +46,7 @@ export function SupplierHistoryRecordsTable({ records }) {
     {
       accessorKey: "totalCost",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
-      cell: ({ getValue }) => <strong>{money(getValue())}</strong>,
+      cell: ({ getValue }) => <strong className="font-mono tabular-nums">{money(getValue())}</strong>,
       sortingFn: "basic",
       meta: { label: "Amount" }
     },

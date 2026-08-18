@@ -120,15 +120,15 @@ export function BoosterPayoutPage({
         <section className={`batch-bar booster-stat-bar ${isAdmin ? "" : "personal-stat-bar"}`} aria-label={isAdmin ? "Admin booster payout totals" : "My payout totals"}>
           {isAdmin ? (
             <>
-              <div><span className="batch-label">Filtered open payout</span><strong>{money(openTotal)}</strong></div>
-              <div><span className="batch-label">Boosters unpaid</span><strong>{unpaidBoosterCount}</strong></div>
-              <div><span className="batch-label">Paid this week</span><strong>{money(paidThisWeek)}</strong></div>
-              <div><span className="batch-label">Needs review</span><strong>{reviewCount}</strong></div>
+              <div className="border-t-2 border-t-sky-400/80"><span className="batch-label">Filtered open payout</span><strong className="text-sky-300">{money(openTotal)}</strong></div>
+              <div className="border-t-2 border-t-amber-400/80"><span className="batch-label">Boosters unpaid</span><strong className="text-amber-300">{unpaidBoosterCount}</strong></div>
+              <div className="border-t-2 border-t-emerald-500/80"><span className="batch-label">Paid this week</span><strong className="text-emerald-300">{money(paidThisWeek)}</strong></div>
+              <div className="border-t-2 border-t-rose-400/80"><span className="batch-label">Needs review</span><strong className={reviewCount > 0 ? "text-rose-300" : "text-slate-300"}>{reviewCount}</strong></div>
             </>
           ) : (
             <>
-              <div><span className="batch-label">Unpaid balance</span><strong>{money(personalUnpaidBalance)}</strong></div>
-              <div><span className="batch-label">Total earned</span><strong>{money(personalEarnedBalance)}</strong></div>
+              <div className="border-t-2 border-t-amber-400/80"><span className="batch-label">Unpaid balance</span><strong className="text-amber-300">{money(personalUnpaidBalance)}</strong></div>
+              <div className="border-t-2 border-t-emerald-500/80"><span className="batch-label">Total earned</span><strong className="text-emerald-300">{money(personalEarnedBalance)}</strong></div>
             </>
           )}
         </section>

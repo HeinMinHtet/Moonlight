@@ -13,7 +13,7 @@ export function DataTableColumnHeader({ column, title, className }) {
     <Button
       variant="ghost"
       size="sm"
-      className={cn("data-table-header-button", className)}
+      className={cn("data-table-header-button text-slate-300 hover:text-white", className)}
       onClick={column.getToggleSortingHandler()}
       aria-label={`Sort ${title}; currently ${directionText}`}
     >

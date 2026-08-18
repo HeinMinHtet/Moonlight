@@ -13,7 +13,7 @@ export function SupplierSummary({ rows, grandTotal, embedded = false, children }
           <p className="panel-note">Only verified unpaid sales records are counted.</p>
         </div>
         <div className="section-actions">
-          <span>{money(grandTotal)}</span>
+          <strong className="font-mono text-xl font-bold tabular-nums text-emerald-300">{money(grandTotal)}</strong>
           {children}
         </div>
       </div>

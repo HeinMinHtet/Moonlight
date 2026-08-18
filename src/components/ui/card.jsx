@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils.js";
 
 export function Card({ className, asChild = false, ...props }) {
   const Comp = asChild ? Slot : "section";
-  return <Comp className={cn("rounded-xl border border-border bg-card text-card-foreground shadow-[0_18px_50px_rgb(1_8_14_/_0.22)]", className)} {...props} />;
+  return <Comp className={cn("rounded-2xl border border-border/80 bg-card/90 text-card-foreground shadow-[0_16px_40px_-10px_rgba(0,0,0,0.4)] backdrop-blur-md", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }) {

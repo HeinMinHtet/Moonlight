@@ -66,10 +66,10 @@ export function SupplierPaidHistoryPage({
         </div>
 
         <section className="batch-bar" aria-label="Filtered paid supplier totals">
-          <div><span className="batch-label">Paid total</span><strong>{money(filteredTotal)}</strong></div>
-          <div><span className="batch-label">Payment batches</span><strong>{batches.length}</strong></div>
-          <div><span className="batch-label">Sales records</span><strong>{filteredRecords.length}</strong></div>
-          <div><span className="batch-label">Paid by</span><strong>{paidByCount}</strong></div>
+          <div className="border-t-2 border-t-emerald-500/80"><span className="batch-label">Paid total</span><strong className="text-emerald-300">{money(filteredTotal)}</strong></div>
+          <div className="border-t-2 border-t-sky-400/80"><span className="batch-label">Payment batches</span><strong className="text-sky-300">{batches.length}</strong></div>
+          <div className="border-t-2 border-t-sky-400/80"><span className="batch-label">Sales records</span><strong className="text-sky-300">{filteredRecords.length}</strong></div>
+          <div className="border-t-2 border-t-amber-400/80"><span className="batch-label">Paid by</span><strong className="text-amber-300">{paidByCount}</strong></div>
         </section>
 
         <section className="filter-bar history-filter-bar" aria-label="Paid supplier history filters">

@@ -7,7 +7,7 @@ export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...props }) {
   return (
     <TabsPrimitive.List
-      className={cn("inline-flex min-h-11 items-center gap-1 rounded-xl bg-secondary p-1 text-muted-foreground", className)}
+      className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-2xl border border-border/80 bg-card/85 p-1.5 text-muted-foreground shadow-md backdrop-blur-md", className)}
       {...props}
     />
   );
@@ -17,7 +17,7 @@ export function TabsTrigger({ className, ...props }) {
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "inline-flex min-h-11 touch-manipulation items-center justify-center whitespace-nowrap rounded-lg bg-transparent px-3 py-2 text-sm font-semibold outline-none transition-[background-color,color,box-shadow] duration-150 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm",
+        "inline-flex min-h-11 touch-manipulation items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-transparent px-3.5 py-2 text-sm font-semibold text-slate-300 outline-none transition-all duration-150 hover:bg-slate-800/70 hover:text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-primary data-[state=active]:font-bold data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_4px_16px_rgba(56,189,248,0.3)]",
         className
       )}
       {...props}

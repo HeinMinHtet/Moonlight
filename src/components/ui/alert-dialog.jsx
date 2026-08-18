@@ -10,7 +10,7 @@ export const AlertDialogPortal = AlertDialogPrimitive.Portal;
 export function AlertDialogOverlay({ className, ...props }) {
   return (
     <AlertDialogPrimitive.Overlay
-      className={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-[2px]", className)}
+      className={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-sm", className)}
       {...props}
     />
   );
@@ -22,7 +22,7 @@ export function AlertDialogContent({ className, ...props }) {
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border/80 bg-card/95 p-6 text-card-foreground shadow-2xl backdrop-blur-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
           className
         )}
         {...props}
