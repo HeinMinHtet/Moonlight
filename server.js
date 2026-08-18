@@ -1,14 +1,41 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { createServer } from "node:http";
-import { buildProfitReport, validIsoDate } from "./lib/profitReport.js";
+import { validIsoDate } from "./lib/profitReport.js";
+import {
+  initDb,
+  getConfig,
+  getSupplierRate,
+  getBoosterRate,
+  getSupplierServicesList,
+  getBoosterPricesList,
+  getArmorTypesList,
+  getSupplierRecordsPayload,
+  insertSupplierRecord,
+  updateSupplierRecord,
+  deleteSupplierRecord,
+  markSupplierRecordsPaid,
+  reopenSupplierPaymentBatch,
+  getBoosterRecordsPayload,
+  insertBoosterRecord,
+  getBoosterRecordById,
+  updateBoosterRecord,
+  deleteBoosterRecord,
+  markBoosterRecordsPaid,
+  updateSupplierServices,
+  updateBoosterPrices,
+  getProfitReportData,
+  getSessionFromDb,
+  saveSessionToDb,
+  deleteSessionFromDb,
+  pruneExpiredSessions,
+  lineTotal
+} from "./lib/db.js";
 
 const root = resolve(".");
 const publicDir = join(root, "public");
 const distDir = join(root, "dist");
-const dataDir = join(root, "data");
-const dbPath = join(dataDir, "database.json");
 const useViteDevServer = process.argv.includes("--dev");
 
 loadEnv();
@@ -24,30 +51,14 @@ const DISCORD_BOOSTER_ROLE_IDS = parseIdList(process.env.DISCORD_BOOSTER_ROLE_ID
 const sessions = new Map();
 const oauthStates = new Map();
 
-const defaultDb = {
-  supplierServices: [
-    { type: "m6", price: 110 },
-    { type: "m10", price: 140 },
-    { type: "m12", price: 190 },
-    { type: "Raid unsaved", price: 950 },
-    { type: "m10 pug", price: 40 },
-    { type: "13 pug", price: 60 },
-    { type: "MOQ unsaved", price: 900 },
-    { type: "Gold", price: 1000 },
-    { type: "3 raids unsaved", price: 1400 },
-    { type: "16 resil", price: 3000 }
-  ],
-  boosterPrices: [
-    { level: "m6", price: 70 },
-    { level: "m10", price: 95 },
-    { level: "m12", price: 130 },
-    { level: "m14", price: 170 },
-    { level: "m16", price: 220 }
-  ],
-  armorTypes: ["Mail", "Cloth", "Leather", "Plate", "No stack"],
-  supplierRecords: [],
-  boosterRecords: []
-};
+// Periodic pruning of in-memory and database sessions
+setInterval(() => {
+  pruneExpiredSessions();
+  const now = Date.now();
+  for (const [id, session] of sessions.entries()) {
+    if (now > Number(session.expiresAt || 0)) sessions.delete(id);
+  }
+}, 15 * 60 * 1000).unref();
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -67,34 +78,6 @@ function loadEnv() {
     const [key, ...rest] = trimmed.split("=");
     if (!process.env[key]) process.env[key] = rest.join("=").trim();
   }
-}
-
-function readDb() {
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
-  if (!existsSync(dbPath)) writeFileSync(dbPath, JSON.stringify(defaultDb, null, 2));
-  const db = JSON.parse(readFileSync(dbPath, "utf8"));
-  return normalizeDb({ ...defaultDb, ...db });
-}
-
-function writeDb(db) {
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
-  const payload = JSON.stringify(db, null, 2);
-  retryFileWrite(() => writeFileSync(dbPath, payload, { encoding: "utf8", flag: "w" }));
-}
-
-function retryFileWrite(writeOperation, attempts = 5) {
-  let lastError;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      writeOperation();
-      return;
-    } catch (error) {
-      lastError = error;
-      if (!["EBADF", "EPERM", "EACCES", "EBUSY"].includes(error.code) || attempt === attempts - 1) break;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
-    }
-  }
-  throw lastError;
 }
 
 function parseIdList(value) {
@@ -144,31 +127,41 @@ function readCookie(req) {
   }
 }
 
-function setSession(res, session) {
+async function setSession(res, session) {
   const id = randomBytes(24).toString("base64url");
   const now = Date.now();
-  sessions.set(id, {
+  const sessionObj = {
     ...session,
     csrfToken: randomBytes(24).toString("base64url"),
     createdAt: now,
     expiresAt: now + SESSION_MAX_AGE_MS
-  });
+  };
+  sessions.set(id, sessionObj);
+  await saveSessionToDb(id, sessionObj);
   res.setHeader("Set-Cookie", `wow_ledger_session=${makeCookie({ id })}; ${cookieOptions(Math.floor(SESSION_MAX_AGE_MS / 1000))}`);
 }
 
-function clearSession(res, req) {
+async function clearSession(res, req) {
   const cookie = readCookie(req);
-  if (cookie?.id) sessions.delete(cookie.id);
+  if (cookie?.id) {
+    sessions.delete(cookie.id);
+    await deleteSessionFromDb(cookie.id);
+  }
   res.setHeader("Set-Cookie", `wow_ledger_session=; ${cookieOptions(0)}`);
 }
 
-function getSession(req) {
+async function getSession(req) {
   const cookie = readCookie(req);
   if (!cookie?.id) return null;
-  const session = sessions.get(cookie.id) || null;
+  let session = sessions.get(cookie.id) || null;
+  if (!session) {
+    session = await getSessionFromDb(cookie.id);
+    if (session) sessions.set(cookie.id, session);
+  }
   if (!session) return null;
   if (Date.now() > Number(session.expiresAt || 0)) {
     sessions.delete(cookie.id);
+    await deleteSessionFromDb(cookie.id);
     return null;
   }
   return session;
@@ -254,116 +247,6 @@ function requireCsrf(req, res, session) {
   return true;
 }
 
-function lineTotal(rate, quantity) {
-  return Number(quantity || 0) * Number(rate || 0);
-}
-
-function supplierRate(db, serviceType) {
-  const service = db.supplierServices.find((item) => item.type === serviceType);
-  return Number(service?.price || 0);
-}
-
-function boosterRate(db, level) {
-  const price = db.boosterPrices.find((item) => item.level === level);
-  return Number(price?.price || 0);
-}
-
-function savedRate(record, totalKey, fallbackRate) {
-  const explicitRate = Number(record.rateAtRecord);
-  if (Number.isFinite(explicitRate) && explicitRate >= 0) return explicitRate;
-  const quantity = Number(record.quantity || 0);
-  const savedTotal = Number(record[totalKey]);
-  if (Number.isFinite(savedTotal) && Number.isFinite(quantity) && quantity > 0) return savedTotal / quantity;
-  return Number(fallbackRate || 0);
-}
-
-function paymentBatchIdFor(record) {
-  if (record.paymentBatchId) return String(record.paymentBatchId);
-  const legacyKey = String(record.paidAt || record.id || "unknown");
-  return `legacy_${Buffer.from(legacyKey).toString("base64url")}`;
-}
-
-function normalizeDb(db) {
-  const normalized = {
-    ...db,
-    supplierServices: (Array.isArray(db.supplierServices) ? db.supplierServices : defaultDb.supplierServices)
-      .map((row) => ({ ...row, active: row.active !== false })),
-    boosterPrices: (Array.isArray(db.boosterPrices) ? db.boosterPrices : defaultDb.boosterPrices)
-      .map((row) => ({ ...row, active: row.active !== false })),
-    armorTypes: Array.isArray(db.armorTypes) ? db.armorTypes : defaultDb.armorTypes,
-    supplierRecords: Array.isArray(db.supplierRecords) ? db.supplierRecords : [],
-    boosterRecords: Array.isArray(db.boosterRecords) ? db.boosterRecords : []
-  };
-
-  normalized.supplierRecords = normalized.supplierRecords.map((record) => {
-    const quantity = Number(record.quantity || 0);
-    const rateAtRecord = savedRate(record, "totalCost", supplierRate(normalized, record.serviceType));
-    return {
-      ...record,
-      quantity,
-      paid: Boolean(record.paid),
-      paymentBatchId: record.paid ? paymentBatchIdFor(record) : null,
-      rateAtRecord,
-      totalCost: lineTotal(rateAtRecord, quantity)
-    };
-  });
-
-  normalized.boosterRecords = normalized.boosterRecords.map((record) => {
-    const quantity = Number(record.quantity || 0);
-    const rateAtRecord = savedRate(record, "totalBalance", boosterRate(normalized, record.level));
-    return {
-      ...record,
-      quantity,
-      paid: Boolean(record.paid),
-      rateAtRecord,
-      totalBalance: lineTotal(rateAtRecord, quantity)
-    };
-  });
-
-  return normalized;
-}
-
-function supplierSummary(db) {
-  const rowsByServiceAndRate = new Map();
-  for (const record of db.supplierRecords) {
-    if (!record.correct || record.paid) continue;
-    const type = record.serviceType || "Unknown service";
-    const rateAtRecord = Number(record.rateAtRecord || 0);
-    const key = `${type}\u0000${rateAtRecord}`;
-    const existing = rowsByServiceAndRate.get(key) || {
-      type,
-      price: rateAtRecord,
-      totalQty: 0,
-      totalCost: 0
-    };
-    existing.totalQty += Number(record.quantity || 0);
-    existing.totalCost += Number(record.totalCost || lineTotal(rateAtRecord, record.quantity));
-    rowsByServiceAndRate.set(key, existing);
-  }
-
-  return [...rowsByServiceAndRate.values()]
-    .filter((row) => Number(row.totalQty || 0) > 0)
-    .sort((a, b) => a.type.localeCompare(b.type) || Number(a.price || 0) - Number(b.price || 0));
-}
-
-function boosterSummary(records) {
-  const rowsByBooster = new Map();
-  for (const record of records) {
-    if (record.paid) continue;
-    const key = record.discordId || record.boosterName || "unknown";
-    const existing = rowsByBooster.get(key) || {
-      discordId: record.discordId,
-      boosterName: record.boosterName || "Unknown booster",
-      openCount: 0,
-      openTotal: 0
-    };
-    existing.openCount += 1;
-    existing.openTotal += Number(record.totalBalance || 0);
-    rowsByBooster.set(key, existing);
-  }
-  return [...rowsByBooster.values()].sort((a, b) => b.openTotal - a.openTotal);
-}
-
 function publicUser(session) {
   if (!session) return null;
   return {
@@ -376,11 +259,11 @@ function publicUser(session) {
 
 async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
-  const db = readDb();
-  const session = getSession(req);
+  const session = await getSession(req);
 
   if (pathname === "/api/config" && req.method === "GET") {
     const permissions = permissionsFor(session);
+    const config = await getConfig(session, permissions);
     return sendJson(res, 200, {
       discordConfigured: discordReady(),
       discordOAuthConfigured: Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET && process.env.DISCORD_REDIRECT_URI),
@@ -388,27 +271,20 @@ async function handleApi(req, res, url) {
       user: publicUser(session),
       csrfToken: session?.csrfToken || null,
       permissions,
-      supplierServices: permissions.supplierRecords ? db.supplierServices : [],
-      boosterPrices: permissions.priceSettings
-        ? db.boosterPrices
-        : db.boosterPrices.filter((row) => row.active !== false).map(({ level }) => ({ level, price: 0, active: true })),
-      armorTypes: db.armorTypes
+      ...config
     });
   }
 
   if (pathname === "/api/logout" && req.method === "POST") {
     if (session && !requireCsrf(req, res, session)) return;
-    clearSession(res, req);
+    await clearSession(res, req);
     return sendJson(res, 200, { ok: true });
   }
 
   if (pathname === "/api/supplier-records" && req.method === "GET") {
     if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can view the sales ledger.");
-    const records = db.supplierRecords.filter((record) => !record.paid);
-    const paidRecords = db.supplierRecords
-      .filter((record) => record.paid)
-      .sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || "")));
-    return sendJson(res, 200, { records, paidRecords, summary: supplierSummary(db) });
+    const payload = await getSupplierRecordsPayload();
+    return sendJson(res, 200, payload);
   }
 
   if (pathname === "/api/profit-report" && req.method === "GET") {
@@ -419,7 +295,8 @@ async function handleApi(req, res, url) {
     if (!validIsoDate(from) || !validIsoDate(to)) return sendJson(res, 400, { error: "Choose a valid profit report date range." });
     if (from > to) return sendJson(res, 400, { error: "Profit report start date must be before the end date." });
     if (!["daily", "monthly"].includes(groupBy)) return sendJson(res, 400, { error: "Profit reports can be grouped daily or monthly." });
-    return sendJson(res, 200, buildProfitReport(db, from, to, groupBy));
+    const report = await getProfitReportData(from, to, groupBy);
+    return sendJson(res, 200, report);
   }
 
   if (pathname === "/api/supplier-records" && req.method === "POST") {
@@ -430,9 +307,15 @@ async function handleApi(req, res, url) {
     const quantity = Number(body.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be greater than 0." });
     const serviceType = String(body.serviceType || "").trim();
-    if (!db.supplierServices.some((service) => service.active !== false && service.type === serviceType)) return sendJson(res, 400, { error: "Choose an active service for this sales record." });
+    const services = await getSupplierServicesList();
+    if (!services.some((service) => service.active !== false && service.type === serviceType)) {
+      return sendJson(res, 400, { error: "Choose an active service for this sales record." });
+    }
+    const armorTypes = await getArmorTypesList();
     const armorType = String(body.armorType || "No stack").trim();
-    if (!db.armorTypes.includes(armorType)) return sendJson(res, 400, { error: "Choose a valid armor stack." });
+    if (!armorTypes.includes(armorType)) return sendJson(res, 400, { error: "Choose a valid armor stack." });
+
+    const rateAtRecord = await getSupplierRate(serviceType);
     const record = {
       id: randomBytes(10).toString("base64url"),
       date: body.date || new Date().toISOString().slice(0, 10),
@@ -443,15 +326,16 @@ async function handleApi(req, res, url) {
       correct: false,
       paid: false,
       note: String(body.note || "").trim(),
-      rateAtRecord: supplierRate(db, serviceType),
+      rateAtRecord,
+      totalCost: lineTotal(rateAtRecord, quantity),
       createdByDiscordId: session.discordId,
       createdByName: session.username,
       createdAt: new Date().toISOString()
     };
-    record.totalCost = lineTotal(record.rateAtRecord, quantity);
-    db.supplierRecords.unshift(record);
-    writeDb(db);
-    return sendJson(res, 201, { record, summary: supplierSummary(db) });
+
+    await insertSupplierRecord(record);
+    const { summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 201, { record, summary });
   }
 
   if (pathname === "/api/supplier-records/mark-paid" && req.method === "POST") {
@@ -461,27 +345,12 @@ async function handleApi(req, res, url) {
     const selectedIds = Array.isArray(body.ids)
       ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
       : null;
-    const payableRecords = db.supplierRecords.filter((record) => {
-      if (!record.correct || record.paid) return false;
-      return selectedIds ? selectedIds.has(record.id) : true;
-    });
-    if (selectedIds && payableRecords.length !== selectedIds.size) return sendJson(res, 400, { error: "Some selected sales records are no longer verified and unpaid. Refresh, then try again." });
-    if (!payableRecords.length) return sendJson(res, 400, { error: "There are no verified unpaid sales records to mark paid." });
-    const paidAt = new Date().toISOString();
-    const paymentBatchId = `spb_${randomBytes(12).toString("base64url")}`;
-    for (const record of payableRecords) {
-      record.paid = true;
-      record.paidAt = paidAt;
-      record.paidByDiscordId = session.discordId;
-      record.paidByName = session.username;
-      record.paymentBatchId = paymentBatchId;
-    }
-    writeDb(db);
-    const records = db.supplierRecords.filter((record) => !record.paid);
-    const paidRecords = db.supplierRecords
-      .filter((record) => record.paid)
-      .sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || "")));
-    return sendJson(res, 200, { paidCount: payableRecords.length, paymentBatchId, records, paidRecords, summary: supplierSummary(db) });
+
+    const result = await markSupplierRecordsPaid(selectedIds, session);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+
+    const { records, paidRecords, summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { paidCount: result.paidCount, paymentBatchId: result.paymentBatchId, records, paidRecords, summary });
   }
 
   if (pathname.startsWith("/api/supplier-payment-batches/") && pathname.endsWith("/reopen") && req.method === "POST") {
@@ -489,28 +358,12 @@ async function handleApi(req, res, url) {
     if (!requireCsrf(req, res, session)) return;
     const pathParts = pathname.split("/").filter(Boolean);
     const paymentBatchId = decodeURIComponent(pathParts[2] || "");
-    const paidRecordsToReopen = db.supplierRecords.filter(
-      (record) => record.paid && paymentBatchIdFor(record) === paymentBatchId
-    );
-    if (!paymentBatchId || !paidRecordsToReopen.length) return sendJson(res, 404, { error: "Paid supplier batch not found. Refresh, then try again." });
-    const reopenedAt = new Date().toISOString();
-    for (const record of paidRecordsToReopen) {
-      record.paid = false;
-      record.lastPaymentBatchId = paymentBatchIdFor(record);
-      record.reopenedAt = reopenedAt;
-      record.reopenedByDiscordId = session.discordId;
-      record.reopenedByName = session.username;
-      record.paidAt = null;
-      record.paidByDiscordId = null;
-      record.paidByName = null;
-      record.paymentBatchId = null;
-    }
-    writeDb(db);
-    const records = db.supplierRecords.filter((record) => !record.paid);
-    const paidRecords = db.supplierRecords
-      .filter((record) => record.paid)
-      .sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || "")));
-    return sendJson(res, 200, { reopenedCount: paidRecordsToReopen.length, records, paidRecords, summary: supplierSummary(db) });
+
+    const result = await reopenSupplierPaymentBatch(paymentBatchId, session);
+    if (result.error) return sendJson(res, 404, { error: result.error });
+
+    const { records, paidRecords, summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { reopenedCount: result.reopenedCount, records, paidRecords, summary });
   }
 
   if (pathname.startsWith("/api/supplier-records/") && req.method === "PATCH") {
@@ -518,70 +371,69 @@ async function handleApi(req, res, url) {
     if (!requireCsrf(req, res, session)) return;
     const id = pathname.split("/").pop();
     const body = await readJson(req);
-    const record = db.supplierRecords.find((item) => item.id === id);
-    if (!record) return sendJson(res, 404, { error: "Sales record not found." });
-    if ("date" in body) record.date = String(body.date || "").trim() || record.date;
+
+    const updates = {};
+    if ("date" in body) updates.date = String(body.date || "").trim();
     if ("buyerName" in body) {
       const buyerName = String(body.buyerName || "").trim();
       if (!buyerName) return sendJson(res, 400, { error: "Buyer character is required." });
-      record.buyerName = buyerName;
+      updates.buyerName = buyerName;
     }
     if ("serviceType" in body) {
       const serviceType = String(body.serviceType || "").trim();
-      const serviceExists = db.supplierServices.some((service) => service.active !== false && service.type === serviceType);
-      if (!serviceExists && serviceType !== record.serviceType) return sendJson(res, 400, { error: "Choose a valid service for this sales record." });
-      record.serviceType = serviceType;
+      const services = await getSupplierServicesList();
+      const serviceExists = services.some((service) => service.active !== false && service.type === serviceType);
+      if (!serviceExists) return sendJson(res, 400, { error: "Choose a valid service for this sales record." });
+      updates.serviceType = serviceType;
     }
     if ("quantity" in body) {
       const quantity = Number(body.quantity);
       if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be greater than 0." });
-      record.quantity = quantity;
+      updates.quantity = quantity;
     }
     if ("armorType" in body) {
       const armorType = String(body.armorType || "").trim();
-      if (!db.armorTypes.includes(armorType) && armorType !== record.armorType) return sendJson(res, 400, { error: "Choose a valid armor stack." });
-      record.armorType = armorType;
+      const armorTypes = await getArmorTypesList();
+      if (!armorTypes.includes(armorType)) return sendJson(res, 400, { error: "Choose a valid armor stack." });
+      updates.armorType = armorType;
     }
     if ("rateAtRecord" in body) {
       const rateAtRecord = Number(body.rateAtRecord);
       if (!Number.isFinite(rateAtRecord) || rateAtRecord < 0) return sendJson(res, 400, { error: "Saved rate must be 0 or greater." });
-      record.rateAtRecord = rateAtRecord;
+      updates.rateAtRecord = rateAtRecord;
     }
-    if ("note" in body) record.note = String(body.note || "").trim();
-    for (const key of ["correct"]) {
-      if (key in body) record[key] = Boolean(body[key]);
-    }
+    if ("note" in body) updates.note = String(body.note || "").trim();
+    if ("correct" in body) updates.correct = Boolean(body.correct);
     if ("paid" in body) {
       const paid = Boolean(body.paid);
-      if (paid && !record.correct) return sendJson(res, 400, { error: "Verify this sales record before marking it paid." });
-      record.paid = paid;
-      record.paidAt = paid ? new Date().toISOString() : null;
-      record.paidByDiscordId = paid ? session.discordId : null;
-      record.paidByName = paid ? session.username : null;
-      record.paymentBatchId = paid ? `spb_${randomBytes(12).toString("base64url")}` : null;
+      updates.paid = paid;
+      updates.paidAt = paid ? new Date().toISOString() : null;
+      updates.paidByDiscordId = paid ? session.discordId : null;
+      updates.paidByName = paid ? session.username : null;
+      updates.paymentBatchId = paid ? `spb_${randomBytes(12).toString("base64url")}` : null;
     }
-    record.totalCost = lineTotal(record.rateAtRecord, record.quantity);
-    writeDb(db);
-    return sendJson(res, 200, { record, summary: supplierSummary(db) });
+
+    const updated = await updateSupplierRecord(id, updates);
+    if (!updated) return sendJson(res, 404, { error: "Sales record not found." });
+
+    const { summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { record: updated, summary });
   }
 
   if (pathname.startsWith("/api/supplier-records/") && req.method === "DELETE") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete sales records.");
     if (!requireCsrf(req, res, session)) return;
     const id = pathname.split("/").pop();
-    const index = db.supplierRecords.findIndex((item) => item.id === id);
-    if (index === -1) return sendJson(res, 404, { error: "Sales record not found." });
-    const [record] = db.supplierRecords.splice(index, 1);
-    writeDb(db);
-    return sendJson(res, 200, { record, summary: supplierSummary(db) });
+    const record = await deleteSupplierRecord(id);
+    if (!record) return sendJson(res, 404, { error: "Sales record not found." });
+    const { summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { record, summary });
   }
 
   if (pathname === "/api/booster-records" && req.method === "GET") {
     if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view payout rows.");
-    const records = canManageAdmin(session)
-      ? db.boosterRecords
-      : db.boosterRecords.filter((record) => record.discordId === session.discordId);
-    return sendJson(res, 200, { records, summary: boosterSummary(records) });
+    const payload = await getBoosterRecordsPayload(session, canManageAdmin(session));
+    return sendJson(res, 200, payload);
   }
 
   if (pathname === "/api/booster-records" && req.method === "POST") {
@@ -592,7 +444,10 @@ async function handleApi(req, res, url) {
     const quantity = Number(body.quantity);
     if (!Number.isInteger(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be a whole number greater than 0." });
     const level = String(body.level || "").trim();
-    if (!db.boosterPrices.some((price) => price.active !== false && price.level === level)) return sendJson(res, 400, { error: "Choose an active Mythic+ key level." });
+    const prices = await getBoosterPricesList();
+    if (!prices.some((price) => price.active !== false && price.level === level)) return sendJson(res, 400, { error: "Choose an active Mythic+ key level." });
+
+    const rateAtRecord = await getBoosterRate(level);
     const record = {
       id: randomBytes(10).toString("base64url"),
       discordId: session.discordId,
@@ -601,12 +456,12 @@ async function handleApi(req, res, url) {
       quantity,
       note: String(body.note || "").trim(),
       paid: false,
-      rateAtRecord: boosterRate(db, level),
+      rateAtRecord,
+      totalBalance: lineTotal(rateAtRecord, quantity),
       createdAt: new Date().toISOString()
     };
-    record.totalBalance = lineTotal(record.rateAtRecord, quantity);
-    db.boosterRecords.unshift(record);
-    writeDb(db);
+
+    await insertBoosterRecord(record);
     return sendJson(res, 201, { record });
   }
 
@@ -618,23 +473,16 @@ async function handleApi(req, res, url) {
       (Array.isArray(body.ids) ? body.ids : []).map((id) => String(id || "").trim()).filter(Boolean)
     );
     if (!selectedIds.size) return sendJson(res, 400, { error: "Select at least one open booster payout row." });
-    const payableRecords = db.boosterRecords.filter((record) => !record.paid && selectedIds.has(record.id));
-    if (payableRecords.length !== selectedIds.size) return sendJson(res, 400, { error: "Some selected booster rows are already paid or no longer available. Refresh, then try again." });
-    const paidAt = new Date().toISOString();
-    const boosterPaymentBatchId = `bpb_${randomBytes(12).toString("base64url")}`;
-    for (const record of payableRecords) {
-      record.paid = true;
-      record.paidAt = paidAt;
-      record.paidByDiscordId = session.discordId;
-      record.paidByName = session.username;
-      record.boosterPaymentBatchId = boosterPaymentBatchId;
-    }
-    writeDb(db);
+
+    const result = await markBoosterRecordsPaid(selectedIds, session);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+
+    const { records, summary } = await getBoosterRecordsPayload(session, true);
     return sendJson(res, 200, {
-      paidCount: payableRecords.length,
-      boosterPaymentBatchId,
-      records: db.boosterRecords,
-      summary: boosterSummary(db.boosterRecords)
+      paidCount: result.paidCount,
+      boosterPaymentBatchId: result.boosterPaymentBatchId,
+      records,
+      summary
     });
   }
 
@@ -642,58 +490,60 @@ async function handleApi(req, res, url) {
     if (!requireCsrf(req, res, session)) return;
     const id = pathname.split("/").pop();
     const body = await readJson(req);
-    const record = db.boosterRecords.find((item) => item.id === id);
+    const record = await getBoosterRecordById(id);
     if (!record) return sendJson(res, 404, { error: "Payout row not found." });
     if (!canEditBoosterRecord(session, record)) return notAllowed(res, "Boosters can only edit their own payout rows.");
+
+    const updates = {};
     if ("paid" in body) {
       if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can mark booster payouts paid.");
       const paid = Boolean(body.paid);
-      record.paid = paid;
-      record.paidAt = paid ? new Date().toISOString() : null;
-      record.paidByDiscordId = paid ? session.discordId : null;
-      record.paidByName = paid ? session.username : null;
-      record.boosterPaymentBatchId = paid ? `bpb_${randomBytes(12).toString("base64url")}` : null;
+      updates.paid = paid;
+      updates.paidAt = paid ? new Date().toISOString() : null;
+      updates.paidByDiscordId = paid ? session.discordId : null;
+      updates.paidByName = paid ? session.username : null;
+      updates.boosterPaymentBatchId = paid ? `bpb_${randomBytes(12).toString("base64url")}` : null;
     }
     if ("level" in body) {
       const level = String(body.level || "").trim();
-      const levelExists = db.boosterPrices.some((price) => price.active !== false && price.level === level);
+      const prices = await getBoosterPricesList();
+      const levelExists = prices.some((price) => price.active !== false && price.level === level);
       if (!levelExists && level !== record.level) return sendJson(res, 400, { error: "Choose a valid Mythic+ key level." });
-      const levelChanged = level !== record.level;
-      record.level = level;
-      if (levelChanged && !canManageAdmin(session)) record.rateAtRecord = boosterRate(db, level);
+      updates.level = level;
+      if (level !== record.level && !("rateAtRecord" in body)) {
+        updates.rateAtRecord = await getBoosterRate(level);
+      }
     }
     if ("quantity" in body) {
       const quantity = Number(body.quantity);
       if (!Number.isInteger(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Runs completed must be a whole number greater than 0." });
-      record.quantity = quantity;
+      updates.quantity = quantity;
     }
     if ("createdAt" in body) {
       const createdAt = String(body.createdAt || "").trim();
       if (!createdAt) return sendJson(res, 400, { error: "Payout date is required." });
-      record.createdAt = createdAt;
+      updates.createdAt = createdAt;
     }
     if ("rateAtRecord" in body) {
       if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change saved payout rates.");
       const rateAtRecord = Number(body.rateAtRecord);
       if (!Number.isFinite(rateAtRecord) || rateAtRecord < 0) return sendJson(res, 400, { error: "Saved payout rate must be 0 or greater." });
-      record.rateAtRecord = rateAtRecord;
+      updates.rateAtRecord = rateAtRecord;
     }
-    if ("note" in body) record.note = String(body.note || "").trim();
-    record.totalBalance = lineTotal(record.rateAtRecord, record.quantity);
-    writeDb(db);
-    return sendJson(res, 200, { record });
+    if ("note" in body) updates.note = String(body.note || "").trim();
+
+    const updated = await updateBoosterRecord(id, updates);
+    return sendJson(res, 200, { record: updated });
   }
 
   if (pathname.startsWith("/api/booster-records/") && req.method === "DELETE") {
     if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to delete payout rows.");
     if (!requireCsrf(req, res, session)) return;
     const id = pathname.split("/").pop();
-    const index = db.boosterRecords.findIndex((item) => item.id === id);
-    if (index === -1) return sendJson(res, 404, { error: "Payout row not found." });
-    const record = db.boosterRecords[index];
+    const record = await getBoosterRecordById(id);
+    if (!record) return sendJson(res, 404, { error: "Payout row not found." });
     if (!canDeleteBoosterRecord(session, record)) return notAllowed(res, "Boosters can only delete their own payout rows.");
-    db.boosterRecords.splice(index, 1);
-    writeDb(db);
+    await deleteBoosterRecord(id);
     return sendJson(res, 200, { record });
   }
 
@@ -701,18 +551,19 @@ async function handleApi(req, res, url) {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change rates.");
     if (!requireCsrf(req, res, session)) return;
     const body = await readJson(req);
-    db.supplierServices = cleanPriceRows(body.rows, "type");
-    writeDb(db);
-    return sendJson(res, 200, { supplierServices: db.supplierServices, summary: supplierSummary(db) });
+    const cleaned = cleanPriceRows(body.rows, "type");
+    const supplierServices = await updateSupplierServices(cleaned);
+    const { summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { supplierServices, summary });
   }
 
   if (pathname === "/api/prices/booster" && req.method === "PUT") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change rates.");
     if (!requireCsrf(req, res, session)) return;
     const body = await readJson(req);
-    db.boosterPrices = cleanPriceRows(body.rows, "level");
-    writeDb(db);
-    return sendJson(res, 200, { boosterPrices: db.boosterPrices });
+    const cleaned = cleanPriceRows(body.rows, "level");
+    const boosterPrices = await updateBoosterPrices(cleaned);
+    return sendJson(res, 200, { boosterPrices });
   }
 
   sendJson(res, 404, { error: "Not found." });
@@ -791,7 +642,7 @@ async function handleDiscord(req, res, url) {
       const role = roleFromDiscordMember(member);
       if (!role) return redirectWithAuthError(res, "Your Discord account does not have an allowed admin or booster role.");
 
-      setSession(res, { role, discordId: user.id, username: user.global_name || user.username });
+      await setSession(res, { role, discordId: user.id, username: user.global_name || user.username });
       res.writeHead(302, { Location: "/" });
       return res.end();
     } catch (error) {
@@ -853,6 +704,9 @@ async function createViteMiddleware() {
     return null;
   }
 }
+
+// Initialize database schema and seeds
+await initDb();
 
 const server = createServer(async (req, res) => {
   try {
