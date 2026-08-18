@@ -238,7 +238,7 @@ function PricePanel({
                         "rate-table-row grid items-center gap-2 px-3 py-1.5 transition-colors hover:bg-muted/20",
                         isArchived && "opacity-75 bg-muted/10",
                         duplicate && "bg-rose-950/20 border-l-2 border-rose-500",
-                        isDefault && "bg-amber-500/[0.04]"
+                        isDefault && "bg-amber-500/[0.06] border-l-2 border-amber-400"
                       )}
                       style={{ gridTemplateColumns: "36px minmax(130px, 1fr) 110px 85px 130px" }}
                     >

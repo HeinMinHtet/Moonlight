@@ -155,10 +155,12 @@
 
   .status-row-review {
     background: color-mix(in srgb, var(--warning) 8%, transparent);
+    box-shadow: inset 3px 0 0 var(--warning);
   }
 
   .status-row-paid {
     background: color-mix(in srgb, var(--success) 7%, transparent);
+    box-shadow: inset 3px 0 0 var(--success);
   }
 
   .status-row-selected {
@@ -167,8 +169,31 @@
   }
 
   .status-row-editing {
-    background: color-mix(in srgb, var(--warning) 10%, transparent);
-    box-shadow: inset 3px 0 0 var(--warning);
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--warning), inset 0 0 0 1px rgba(245, 158, 11, 0.2);
+  }
+
+  .entry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    padding: 14px 16px;
+    align-items: end;
+  }
+
+  .entry-grid .record-action {
+    min-height: 44px;
+    height: 44px;
+    justify-self: stretch;
+  }
+
+  @media (max-width: 640px) {
+    .entry-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .entry-grid .record-action {
+      grid-column: span 2;
+    }
   }
 
   .kpi-tile {

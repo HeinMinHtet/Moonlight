@@ -3,6 +3,7 @@ import { api } from "../../api.js";
 import { dateOnly, money, today } from "../../utils/format.js";
 import { AccessDenied } from "../AccessDenied.jsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Empty, EmptyDescription, EmptyTitle } from "@/components/ui/empty.jsx";
@@ -52,6 +53,9 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
   const totals = report?.totals || emptyTotals;
   const rows = report?.rows || [];
   const netTone = totals.netProfit < 0 ? "profit-negative" : "profit-positive";
+  const profitMargin = totals.supplierPaidTotal > 0
+    ? Math.round((totals.netProfit / totals.supplierPaidTotal) * 100)
+    : 0;
 
   return (
     <section className="tab-panel active">
@@ -95,7 +99,14 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
             <small>{totals.boosterRecordCount} payout rows</small>
           </div>
           <div className={cn(netTone, totals.netProfit < 0 ? "border-t-2 border-t-rose-500/80" : "border-t-2 border-t-emerald-500/80")}>
-            <span className="batch-label">Net profit</span>
+            <div className="flex items-center justify-between">
+              <span className="batch-label">Net profit</span>
+              {totals.supplierPaidTotal > 0 && (
+                <Badge variant={totals.netProfit >= 0 ? "success" : "destructive"} className="text-[10px] px-1.5 py-0.5">
+                  {profitMargin}% margin
+                </Badge>
+              )}
+            </div>
             <strong className={totals.netProfit < 0 ? "text-rose-300" : "text-emerald-300"}>{money(totals.netProfit)}</strong>
             <small>Supplier paid minus booster paid</small>
           </div>

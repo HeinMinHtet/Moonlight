@@ -119,6 +119,7 @@ select:focus-visible,
 .topbar {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 18px;
   background: linear-gradient(135deg, rgba(18, 30, 48, 0.9), rgba(11, 19, 32, 0.8));
@@ -793,9 +794,9 @@ tbody tr:hover { background-color: rgba(56, 189, 248, 0.06); }
 }
 
 .status-toggle.needs-review {
-  background: rgba(169, 120, 37, 0.14);
-  border-color: rgba(169, 120, 37, 0.38);
-  color: #dfb76e;
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
 }
 
 .note-cell {

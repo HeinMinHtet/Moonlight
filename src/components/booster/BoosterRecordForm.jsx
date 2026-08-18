@@ -11,8 +11,15 @@ export function BoosterRecordForm({ disabled, prices, onSubmit }) {
   const levelOptions = withCurrent(prices.map((price) => price.level), draft.level);
   const update = (key) => (event) => setDraft((current) => ({ ...current, [key]: event.target.value }));
 
+  const handleKeyDown = (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.requestSubmit();
+    }
+  };
+
   return (
-    <form className="entry-grid booster-entry" onSubmit={onSubmit}>
+    <form className="entry-grid booster-entry" onSubmit={onSubmit} onKeyDown={handleKeyDown}>
       <Label>Mythic+ key <NativeSelect name="level" value={draft.level} onChange={update("level")} disabled={disabled}>{levelOptions.map((level) => <option key={level} value={level}>{level}</option>)}</NativeSelect></Label>
       <Label>Runs completed <Input name="quantity" type="number" min="1" step="1" value={draft.quantity} onChange={update("quantity")} disabled={disabled} /></Label>
       <Label>Note <Input name="note" placeholder="Optional run note" value={draft.note} onChange={update("note")} disabled={disabled} /></Label>

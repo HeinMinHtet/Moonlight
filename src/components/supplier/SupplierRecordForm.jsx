@@ -20,8 +20,15 @@ export function SupplierRecordForm({ disabled, services, armorTypes, onSubmit })
   const armorOptions = withCurrent(armorTypes, draft.armorType);
   const update = (key) => (event) => setDraft((current) => ({ ...current, [key]: event.target.value }));
 
+  const handleKeyDown = (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.requestSubmit();
+    }
+  };
+
   return (
-    <form className="entry-grid" onSubmit={onSubmit}>
+    <form className="entry-grid" onSubmit={onSubmit} onKeyDown={handleKeyDown}>
       <Label>Date <Input name="date" type="date" value={draft.date} onChange={update("date")} disabled={disabled} /></Label>
       <Label>Buyer character <Input name="buyerName" placeholder="Character name" value={draft.buyerName} onChange={update("buyerName")} disabled={disabled} /></Label>
       <Label>Service <NativeSelect name="serviceType" value={draft.serviceType} onChange={update("serviceType")} disabled={disabled}>{serviceOptions.map((type) => <option key={type} value={type}>{type}</option>)}</NativeSelect></Label>
