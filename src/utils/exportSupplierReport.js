@@ -10,11 +10,12 @@ function escapeSvg(value) {
 }
 
 function svgText(value, x, y, options = {}) {
-  const size = options.size || 18;
+  const size = options.size || 15;
   const weight = options.weight || 400;
-  const color = options.color || "#18223b";
+  const color = options.color || "#e2e8f0";
   const anchor = options.anchor ? ` text-anchor="${options.anchor}"` : "";
-  return `<text x="${x}" y="${y}" fill="${color}" font-size="${size}" font-weight="${weight}" font-family="Arial, Helvetica, sans-serif"${anchor}>${escapeSvg(value)}</text>`;
+  const isMono = options.mono ? ` font-family="'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace"` : ` font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"`;
+  return `<text x="${x}" y="${y}" fill="${color}" font-size="${size}" font-weight="${weight}"${isMono}${anchor}>${escapeSvg(value)}</text>`;
 }
 
 function truncateText(value, maxLength) {
@@ -43,93 +44,113 @@ export async function exportSupplierReport(records, summary, grandTotal, options
   if (!verifiedRecords.length) throw new Error("No verified sales are available to export.");
 
   const width = 1600;
-  const rowHeight = 38;
-  const tableTop = 238;
+  const rowHeight = 36;
+  const tableTop = 100;
   const recordRowsTop = tableTop + 38;
-  const summaryStart = recordRowsTop + verifiedRecords.length * rowHeight + 66;
-  const summaryRowsTop = summaryStart + 74;
-  const height = summaryRowsTop + Math.max(summary.length, 1) * rowHeight + 72;
-  const recordColumns = [48, 118, 270, 490, 690, 780, 930, 1080, 1230];
-  const summaryColumns = [48, 420, 620, 820];
+  const summaryStart = recordRowsTop + verifiedRecords.length * rowHeight + 36;
+  const summaryRowsTop = summaryStart + 66;
+  const summaryCount = Math.max(summary.length, 1);
+  const height = summaryRowsTop + summaryCount * rowHeight + 44;
+
+  const recordColumns = [52, 106, 224, 450, 690, 840, 890, 1110, 1150];
+  const summaryColumns = [52, 470, 670, 890];
+
   const dates = verifiedRecords.map((record) => normalizedSaleDate(record.date)).filter(Boolean).sort();
   const startDate = dates[0] || today();
   const lastDate = dates.at(-1) || startDate;
   const dateRange = startDate === lastDate ? startDate : `${startDate} to ${lastDate}`;
-  const title = options.title || "Verified Supplier Sales";
-  const totalLabel = options.totalLabel || "Verified unpaid total";
   const batchLabel = options.batchLabel || "";
 
   const recordRows = verifiedRecords.map((record, index) => {
     const y = recordRowsTop + index * rowHeight;
-    const fill = index % 2 ? "#eaf0fa" : "#f8faff";
+    const fill = index % 2 ? "#0e1726" : "#121d30";
     return `
       <rect x="32" y="${y}" width="1536" height="${rowHeight}" fill="${fill}" />
-      ${svgText(index + 1, recordColumns[0], y + 25, { size: 15, weight: 700 })}
-      ${svgText(dateOnly(record.date), recordColumns[1], y + 25, { size: 15 })}
-      ${svgText(truncateText(record.buyerName, 22), recordColumns[2], y + 25, { size: 15, weight: 700 })}
-      ${svgText(truncateText(record.serviceType, 22), recordColumns[3], y + 25, { size: 15 })}
-      ${svgText(money(record.quantity), recordColumns[4], y + 25, { size: 15 })}
-      ${svgText(money(record.rateAtRecord), recordColumns[5], y + 25, { size: 15 })}
-      ${svgText(truncateText(record.armorType, 16), recordColumns[6], y + 25, { size: 15 })}
-      ${svgText(money(record.totalCost), recordColumns[7], y + 25, { size: 15, weight: 800, color: "#2b4c84" })}
-      ${svgText(truncateText(record.note || "-", 38), recordColumns[8], y + 25, { size: 14, color: "#61708d" })}
+      <line x1="32" y1="${y + rowHeight}" x2="1568" y2="${y + rowHeight}" stroke="#1e2d42" stroke-width="0.75" />
+      ${svgText(index + 1, recordColumns[0], y + 23, { size: 13, weight: 600, color: "#64748b" })}
+      ${svgText(dateOnly(record.date), recordColumns[1], y + 23, { size: 13, color: "#94a3b8" })}
+      ${svgText(truncateText(record.buyerName, 22), recordColumns[2], y + 23, { size: 14, weight: 700, color: "#f8fafc" })}
+      ${svgText(truncateText(record.serviceType, 22), recordColumns[3], y + 23, { size: 14, color: "#e2e8f0" })}
+      ${svgText(money(record.quantity), recordColumns[4], y + 23, { size: 14, color: "#e2e8f0", anchor: "end", mono: true })}
+      ${svgText(money(record.rateAtRecord), recordColumns[5], y + 23, { size: 14, color: "#cbd5e1", anchor: "end", mono: true })}
+      ${svgText(truncateText(record.armorType, 16), recordColumns[6], y + 23, { size: 13, color: "#94a3b8" })}
+      ${svgText(money(record.totalCost), recordColumns[7], y + 23, { size: 14, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
+      ${svgText(truncateText(record.note || "-", 38), recordColumns[8], y + 23, { size: 13, color: "#64748b" })}
     `;
   }).join("");
 
   const summaryRows = summary.map((row, index) => {
     const y = summaryRowsTop + index * rowHeight;
-    const fill = index % 2 ? "#eaf0fa" : "#f8faff";
+    const fill = index % 2 ? "#0e1726" : "#121d30";
     return `
-      <rect x="32" y="${y}" width="900" height="${rowHeight}" fill="${fill}" />
-      ${svgText(truncateText(row.type, 34), summaryColumns[0], y + 25, { size: 15, weight: 700 })}
-      ${svgText(money(row.totalQty), summaryColumns[1], y + 25, { size: 15 })}
-      ${svgText(money(row.price), summaryColumns[2], y + 25, { size: 15 })}
-      ${svgText(money(row.totalCost), summaryColumns[3], y + 25, { size: 15, weight: 800, color: "#2b4c84" })}
+      <rect x="32" y="${y}" width="910" height="${rowHeight}" fill="${fill}" />
+      <line x1="32" y1="${y + rowHeight}" x2="942" y2="${y + rowHeight}" stroke="#1e2d42" stroke-width="0.75" />
+      ${svgText(truncateText(row.type, 34), summaryColumns[0], y + 23, { size: 14, weight: 700, color: "#f8fafc" })}
+      ${svgText(money(row.totalQty), summaryColumns[1], y + 23, { size: 14, color: "#e2e8f0", anchor: "end", mono: true })}
+      ${svgText(money(row.price), summaryColumns[2], y + 23, { size: 14, color: "#cbd5e1", anchor: "end", mono: true })}
+      ${svgText(money(row.totalCost), summaryColumns[3], y + 23, { size: 14, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
     `;
   }).join("");
 
+  const netTotalCardHeight = Math.max(98, summaryCount * rowHeight + 32);
+
+  const totalLabel = options.totalLabel || "NET TOTAL";
+  const summaryTitle = options.summaryTitle || "Sale Summary";
+
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <rect width="100%" height="100%" fill="#080d20" />
-      <rect x="20" y="20" width="1560" height="${height - 40}" rx="8" fill="#f4f7fc" stroke="#8fb9ff" stroke-width="2" />
-      <rect x="20" y="20" width="1560" height="104" rx="8" fill="#111937" />
-      ${svgText("MOONLIGHT WOW OPERATIONS", 48, 52, { size: 13, weight: 800, color: "#8fb9ff" })}
-      ${svgText(title, 48, 92, { size: 32, weight: 800, color: "#edf4ff" })}
-      ${batchLabel ? svgText(truncateText(batchLabel, 48), 1552, 86, { size: 15, weight: 700, color: "#bdcbe1", anchor: "end" }) : ""}
+      <defs>
+        <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#0f1e36" />
+          <stop offset="100%" stop-color="#162744" />
+        </linearGradient>
+        <linearGradient id="totalCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0e1f38" />
+          <stop offset="100%" stop-color="#142646" />
+        </linearGradient>
+      </defs>
 
-      <rect x="32" y="140" width="430" height="72" rx="6" fill="#ffffff" stroke="#c9d4e7" />
-      ${svgText("SALE DATE RANGE", 52, 166, { size: 12, weight: 800, color: "#61708d" })}
-      ${svgText(dateRange, 52, 196, { size: 21, weight: 800, color: "#2b4c84" })}
-      <rect x="478" y="140" width="250" height="72" rx="6" fill="#ffffff" stroke="#c9d4e7" />
-      ${svgText("VERIFIED ROWS", 498, 166, { size: 12, weight: 800, color: "#61708d" })}
-      ${svgText(verifiedRecords.length, 498, 196, { size: 21, weight: 800, color: "#2b4c84" })}
-      <rect x="744" y="140" width="808" height="72" rx="6" fill="#ffffff" stroke="#c9d4e7" />
-      ${svgText(totalLabel.toLocaleUpperCase(), 764, 166, { size: 12, weight: 800, color: "#61708d" })}
-      ${svgText(money(grandTotal), 1532, 197, { size: 27, weight: 800, color: "#285e54", anchor: "end" })}
+      <!-- Background Canvas -->
+      <rect width="100%" height="100%" fill="#070c18" />
+      <rect x="18" y="18" width="1564" height="${height - 36}" rx="12" fill="#0b1322" stroke="#1a2b42" stroke-width="1.5" />
 
-      <rect x="32" y="${tableTop}" width="1536" height="38" fill="#111937" />
-      ${svgText("#", recordColumns[0], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Date", recordColumns[1], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Buyer", recordColumns[2], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Service", recordColumns[3], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Qty", recordColumns[4], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Saved rate", recordColumns[5], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Armor", recordColumns[6], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Amount", recordColumns[7], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Note", recordColumns[8], tableTop + 25, { size: 13, weight: 800, color: "#edf4ff" })}
+      <!-- Top Header Bar -->
+      <rect x="24" y="24" width="1552" height="60" rx="8" fill="url(#headerGrad)" stroke="#1e354e" stroke-width="1" />
+      ${svgText("MOONLIGHT WOW", 48, 54, { size: 20, weight: 800, color: "#38bdf8" })}
+      ${svgText(`•  ${dateRange}  •  ${verifiedRecords.length} Verified Records`, 255, 54, { size: 13, weight: 600, color: "#94a3b8" })}
+      ${batchLabel ? svgText(truncateText(batchLabel, 48), 1548, 54, { size: 13, weight: 600, color: "#cbd5e1", anchor: "end" }) : ""}
+
+      <!-- Main Records Table Header -->
+      <rect x="32" y="${tableTop}" width="1536" height="38" rx="6" fill="#182744" />
+      ${svgText("#", recordColumns[0], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText("DATE", recordColumns[1], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText("BUYER", recordColumns[2], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText("SERVICE", recordColumns[3], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText("QTY", recordColumns[4], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8", anchor: "end" })}
+      ${svgText("SAVED RATE", recordColumns[5], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8", anchor: "end" })}
+      ${svgText("ARMOR", recordColumns[6], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText("AMOUNT", recordColumns[7], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8", anchor: "end" })}
+      ${svgText("NOTE", recordColumns[8], tableTop + 24, { size: 12, weight: 800, color: "#94a3b8" })}
+
+      <!-- Main Records Rows -->
       ${recordRows}
 
-      ${svgText("Verified sales summary", 48, summaryStart + 30, { size: 23, weight: 800 })}
-      <rect x="32" y="${summaryStart + 40}" width="900" height="34" fill="#192447" />
-      ${svgText("Service", summaryColumns[0], summaryStart + 63, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Total qty", summaryColumns[1], summaryStart + 63, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Rate", summaryColumns[2], summaryStart + 63, { size: 13, weight: 800, color: "#edf4ff" })}
-      ${svgText("Amount", summaryColumns[3], summaryStart + 63, { size: 13, weight: 800, color: "#edf4ff" })}
+      <!-- Bottom Summary Header -->
+      ${svgText(summaryTitle, 48, summaryStart + 20, { size: 16, weight: 800, color: "#f1f5f9" })}
+      <rect x="32" y="${summaryStart + 32}" width="910" height="34" rx="6" fill="#182744" />
+      ${svgText("SERVICE", summaryColumns[0], summaryStart + 54, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText("TOTAL QTY", summaryColumns[1], summaryStart + 54, { size: 12, weight: 800, color: "#94a3b8", anchor: "end" })}
+      ${svgText("RATE", summaryColumns[2], summaryStart + 54, { size: 12, weight: 800, color: "#94a3b8", anchor: "end" })}
+      ${svgText("AMOUNT", summaryColumns[3], summaryStart + 54, { size: 12, weight: 800, color: "#94a3b8", anchor: "end" })}
+
+      <!-- Bottom Summary Rows -->
       ${summaryRows}
 
-      <rect x="980" y="${summaryStart + 40}" width="572" height="${Math.max(112, summary.length * rowHeight + 34)}" rx="6" fill="#111937" />
-      ${svgText("NET SUPPLIER TOTAL", 1012, summaryStart + 78, { size: 13, weight: 800, color: "#8fb9ff" })}
-      ${svgText(money(grandTotal), 1520, summaryStart + 126, { size: 32, weight: 800, color: "#edf4ff", anchor: "end" })}
+      <!-- Net Total Card -->
+      <rect x="968" y="${summaryStart + 32}" width="600" height="${netTotalCardHeight}" rx="8" fill="url(#totalCardGrad)" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.35" />
+      ${svgText(totalLabel.toUpperCase(), 996, summaryStart + 66, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText(`${dateRange}  •  ${verifiedRecords.length} records`, 996, summaryStart + 90, { size: 12, weight: 600, color: "#64748b" })}
+      ${svgText(money(grandTotal), 1540, summaryStart + 86, { size: 38, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
     </svg>
   `;
 
