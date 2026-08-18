@@ -574,7 +574,12 @@ function cleanPriceRows(rows, key) {
     throw Object.assign(new Error("Keep at least one rate row. Archive rates that should no longer be used."), { statusCode: 400 });
   }
   const cleaned = rows
-    .map((row) => ({ [key]: String(row[key] || "").trim(), price: Number(row.price), active: row.active !== false }));
+    .map((row) => ({
+      [key]: String(row[key] || "").trim(),
+      price: Number(row.price),
+      active: row.active !== false,
+      isDefault: Boolean(row.isDefault)
+    }));
   if (cleaned.some((row) => !row[key] || !Number.isFinite(row.price) || row.price < 0)) {
     throw Object.assign(new Error("Every rate needs a name and a value of 0 or greater."), { statusCode: 400 });
   }

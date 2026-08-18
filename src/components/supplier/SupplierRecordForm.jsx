@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label.jsx";
 import { NativeSelect } from "@/components/ui/native-select.jsx";
 
 export function SupplierRecordForm({ disabled, services, armorTypes, onSubmit }) {
+  const defaultServiceType = services.find((s) => s.isDefault && s.active !== false)?.type || services.find((s) => s.active !== false)?.type || services[0]?.type || "";
   const [draft, setDraft] = useState(() => ({
     date: today(),
     buyerName: "",
-    serviceType: services[0]?.type || "",
+    serviceType: defaultServiceType,
     quantity: "1",
     armorType: armorTypes[0] || "No stack",
     note: ""

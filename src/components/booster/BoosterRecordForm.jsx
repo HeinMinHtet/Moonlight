@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label.jsx";
 import { NativeSelect } from "@/components/ui/native-select.jsx";
 
 export function BoosterRecordForm({ disabled, prices, onSubmit }) {
-  const [draft, setDraft] = useState(() => ({ level: prices[0]?.level || "", quantity: "1", note: "" }));
+  const defaultLevel = prices.find((p) => p.isDefault && p.active !== false)?.level || prices.find((p) => p.active !== false)?.level || prices[0]?.level || "";
+  const [draft, setDraft] = useState(() => ({ level: defaultLevel, quantity: "1", note: "" }));
   const levelOptions = withCurrent(prices.map((price) => price.level), draft.level);
   const update = (key) => (event) => setDraft((current) => ({ ...current, [key]: event.target.value }));
 

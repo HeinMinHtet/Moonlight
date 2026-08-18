@@ -1078,15 +1078,31 @@ td .table-edit[type="number"] {
 }
 
 .price-row {
-  align-items: end;
+  align-items: center;
   background: var(--field);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 140px auto;
-  gap: 8px;
-  padding: 12px;
+  grid-template-columns: auto minmax(160px, 1fr) 130px auto;
+  gap: 10px;
+  padding: 10px 14px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: all 150ms ease;
+}
+
+.price-row.has-default {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: color-mix(in srgb, var(--warning) 4%, var(--field));
+}
+
+.rate-star-btn {
+  height: 40px;
+  width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  align-self: center;
 }
 
 .price-row label { display: grid; gap: 4px; }
@@ -1105,7 +1121,7 @@ td .table-edit[type="number"] {
 .rate-row-meta {
   align-items: center;
   display: flex;
-  gap: 7px;
+  gap: 8px;
   min-height: 40px;
 }
 

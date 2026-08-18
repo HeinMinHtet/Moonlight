@@ -460,6 +460,32 @@ export function App() {
     showToast(archiving ? "Rate marked for archive. Save changes to apply." : "Rate restored. Save changes to apply.");
   });
 
+  const deletePriceRow = (collection, index) => {
+    const row = data[collection][index];
+    if (!row) return;
+    setData((current) => ({
+      ...current,
+      [collection]: current[collection].filter((_, rowIndex) => rowIndex !== index)
+    }));
+    showToast("Rate row removed. Save changes to apply.");
+  };
+
+  const setDefaultPriceRow = (collection, index) => {
+    setData((current) => {
+      const currentRows = current[collection] || [];
+      const targetRow = currentRows[index];
+      if (!targetRow) return current;
+      const willBeDefault = !targetRow.isDefault;
+      return {
+        ...current,
+        [collection]: currentRows.map((row, rowIndex) => ({
+          ...row,
+          isDefault: rowIndex === index ? willBeDefault : false
+        }))
+      };
+    });
+  };
+
   const addPriceRow = (collection, key) => {
     if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit rates.");
     setData((current) => ({ ...current, [collection]: [...current[collection], { [key]: "", price: 0, active: true }] }));
@@ -559,19 +585,21 @@ export function App() {
 
         {activeTab === "prices" && (
           <RateSettingsPage
-          isAdmin={isAdmin}
-          loading={loading}
-          loadError={loadError}
-          canEditPrices={permissions.canEditPrices}
-          supplierServices={data.supplierServices}
-          boosterPrices={data.boosterPrices}
-          supplierRecords={[...data.supplierRecords, ...data.supplierHistory]}
-          boosterRecords={data.boosterRecords}
-          onAddPriceRow={addPriceRow}
-          onTogglePriceRow={togglePriceRowStatus}
-          onUpdatePriceRow={updatePriceRow}
-          onSaveSupplierPrices={saveSupplierPrices}
-          onSaveBoosterPrices={saveBoosterPrices}
+            isAdmin={isAdmin}
+            loading={loading}
+            loadError={loadError}
+            canEditPrices={permissions.canEditPrices}
+            supplierServices={data.supplierServices}
+            boosterPrices={data.boosterPrices}
+            supplierRecords={[...data.supplierRecords, ...data.supplierHistory]}
+            boosterRecords={data.boosterRecords}
+            onAddPriceRow={addPriceRow}
+            onTogglePriceRow={togglePriceRowStatus}
+            onDeletePriceRow={deletePriceRow}
+            onSetDefaultPriceRow={setDefaultPriceRow}
+            onUpdatePriceRow={updatePriceRow}
+            onSaveSupplierPrices={saveSupplierPrices}
+            onSaveBoosterPrices={saveBoosterPrices}
           />
         )}
       </div>
