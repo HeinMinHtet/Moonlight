@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { createServer } from "node:http";
@@ -47,6 +47,16 @@ loadEnv();
 
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_SECRET = process.env.SESSION_SECRET || "local-development-secret";
+if (
+  process.env.NODE_ENV === "production" &&
+  (!process.env.SESSION_SECRET ||
+    process.env.SESSION_SECRET === "local-development-secret" ||
+    process.env.SESSION_SECRET === "change-this-long-random-secret")
+) {
+  console.warn(
+    "[SECURITY WARNING] Running in production with an unset or default SESSION_SECRET. Set a strong random SESSION_SECRET in your environment before public launch."
+  );
+}
 const SESSION_MAX_AGE_MS = Number(process.env.SESSION_MAX_AGE_HOURS || 12) * 60 * 60 * 1000;
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const SECURE_COOKIE = process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production";
@@ -124,7 +134,9 @@ function readCookie(req) {
   const raw = cookies.wow_ledger_session;
   if (!raw || !raw.includes(".")) return null;
   const [encoded, signature] = raw.split(".");
-  if (sign(encoded) !== signature) return null;
+  const expectedSig = Buffer.from(sign(encoded));
+  const actualSig = Buffer.from(signature || "");
+  if (expectedSig.length !== actualSig.length || !timingSafeEqual(expectedSig, actualSig)) return null;
   try {
     return JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
   } catch {
@@ -230,9 +242,13 @@ function sendJson(res, status, payload) {
 
 function setSecurityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "same-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
+  );
 }
 
 function notAllowed(res, error = "You do not have access to this action.") {
@@ -320,10 +336,13 @@ async function handleApi(req, res, url) {
     const armorType = String(body.armorType || "No stack").trim();
     if (!armorTypes.includes(armorType)) return sendJson(res, 400, { error: "Choose a valid armor stack." });
 
+    const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
+    if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid sales record date." });
+
     const rateAtRecord = await getSupplierRate(serviceType);
     const record = {
       id: randomBytes(10).toString("base64url"),
-      date: body.date || new Date().toISOString().slice(0, 10),
+      date,
       buyerName: String(body.buyerName).trim(),
       serviceType,
       quantity,
@@ -378,7 +397,11 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
 
     const updates = {};
-    if ("date" in body) updates.date = String(body.date || "").trim();
+    if ("date" in body) {
+      const date = String(body.date || "").trim();
+      if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid sales record date." });
+      updates.date = date;
+    }
     if ("buyerName" in body) {
       const buyerName = String(body.buyerName || "").trim();
       if (!buyerName) return sendJson(res, 400, { error: "Buyer character is required." });
@@ -529,8 +552,12 @@ async function handleApi(req, res, url) {
     }
     if ("createdAt" in body) {
       const createdAt = String(body.createdAt || "").trim();
-      if (!createdAt) return sendJson(res, 400, { error: "Payout date is required." });
-      updates.createdAt = createdAt;
+      const isDateOnly = validIsoDate(createdAt);
+      const isParsable = !Number.isNaN(Date.parse(createdAt));
+      if (!createdAt || (!isDateOnly && !isParsable)) {
+        return sendJson(res, 400, { error: "Choose a valid payout date." });
+      }
+      updates.createdAt = isDateOnly ? `${createdAt}T00:00:00.000Z` : new Date(createdAt).toISOString();
     }
     if ("rateAtRecord" in body) {
       if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change saved payout rates.");

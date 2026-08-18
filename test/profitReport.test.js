@@ -40,4 +40,7 @@ test("date validation rejects impossible calendar dates", () => {
   assert.equal(validIsoDate("2026-08-17"), true);
   assert.equal(validIsoDate("2026-02-30"), false);
   assert.equal(validIsoDate("08/17/2026"), false);
+  assert.equal(validIsoDate(""), false);
+  assert.equal(validIsoDate(null), false);
 });
+
