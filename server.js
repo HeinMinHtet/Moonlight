@@ -23,6 +23,11 @@ import {
   updateBoosterRecord,
   deleteBoosterRecord,
   markBoosterRecordsPaid,
+  getBoosterAdjustmentsPayload,
+  insertBoosterAdjustment,
+  getBoosterAdjustmentById,
+  updateBoosterAdjustment,
+  deleteBoosterAdjustment,
   updateSupplierServices,
   updateBoosterPrices,
   getProfitReportData,
@@ -433,7 +438,8 @@ async function handleApi(req, res, url) {
   if (pathname === "/api/booster-records" && req.method === "GET") {
     if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view payout rows.");
     const payload = await getBoosterRecordsPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, payload);
+    const { adjustments } = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
+    return sendJson(res, 200, { ...payload, adjustments });
   }
 
   if (pathname === "/api/booster-records" && req.method === "POST") {
@@ -478,11 +484,13 @@ async function handleApi(req, res, url) {
     if (result.error) return sendJson(res, 400, { error: result.error });
 
     const { records, summary } = await getBoosterRecordsPayload(session, true);
+    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
     return sendJson(res, 200, {
       paidCount: result.paidCount,
       boosterPaymentBatchId: result.boosterPaymentBatchId,
       records,
-      summary
+      summary,
+      adjustments
     });
   }
 
@@ -545,6 +553,94 @@ async function handleApi(req, res, url) {
     if (!canDeleteBoosterRecord(session, record)) return notAllowed(res, "Boosters can only delete their own payout rows.");
     await deleteBoosterRecord(id);
     return sendJson(res, 200, { record });
+  }
+
+  if (pathname === "/api/booster-adjustments" && req.method === "GET") {
+    if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view adjustments.");
+    const payload = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
+    return sendJson(res, 200, payload);
+  }
+
+  if (pathname === "/api/booster-adjustments" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can create booster balance adjustments.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const boosterName = String(body.boosterName || "").trim();
+    const discordId = String(body.discordId || "").trim();
+    const type = String(body.type || "").trim();
+    const amount = Number(body.amount);
+    const note = String(body.note || "").trim();
+    const date = String(body.date || new Date().toISOString().slice(0, 10)).trim();
+
+    if (!boosterName) return sendJson(res, 400, { error: "Booster name is required." });
+    if (type !== "add" && type !== "deduct") return sendJson(res, 400, { error: "Adjustment type must be 'add' or 'deduct'." });
+    if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Adjustment amount must be greater than 0." });
+    if (!note) return sendJson(res, 400, { error: "Reason / note is required for balance adjustments." });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
+
+    const adjustment = {
+      id: `badj_${randomBytes(10).toString("base64url")}`,
+      discordId,
+      boosterName,
+      type,
+      amount,
+      note,
+      date,
+      createdAt: new Date().toISOString(),
+      createdByDiscordId: session.discordId,
+      createdByName: session.username
+    };
+
+    await insertBoosterAdjustment(adjustment);
+    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+    return sendJson(res, 201, { adjustment, adjustments });
+  }
+
+  if (pathname.startsWith("/api/booster-adjustments/") && req.method === "PATCH") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can edit booster balance adjustments.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const body = await readJson(req);
+    const existing = await getBoosterAdjustmentById(id);
+    if (!existing) return sendJson(res, 404, { error: "Adjustment not found." });
+
+    const updates = {};
+    if ("amount" in body) {
+      const amount = Number(body.amount);
+      if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Adjustment amount must be greater than 0." });
+      updates.amount = amount;
+    }
+    if ("note" in body) {
+      const note = String(body.note || "").trim();
+      if (!note) return sendJson(res, 400, { error: "Reason / note is required." });
+      updates.note = note;
+    }
+    if ("date" in body) {
+      const date = String(body.date || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
+      updates.date = date;
+    }
+    if ("type" in body) {
+      const type = String(body.type || "").trim();
+      if (type !== "add" && type !== "deduct") return sendJson(res, 400, { error: "Type must be 'add' or 'deduct'." });
+      updates.type = type;
+    }
+
+    const updated = await updateBoosterAdjustment(id, updates);
+    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+    return sendJson(res, 200, { adjustment: updated, adjustments });
+  }
+
+  if (pathname.startsWith("/api/booster-adjustments/") && req.method === "DELETE") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete booster balance adjustments.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getBoosterAdjustmentById(id);
+    if (!existing) return sendJson(res, 404, { error: "Adjustment not found." });
+
+    await deleteBoosterAdjustment(id);
+    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+    return sendJson(res, 200, { deletedId: id, adjustments });
   }
 
   if (pathname === "/api/prices/supplier" && req.method === "PUT") {

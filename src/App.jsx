@@ -33,7 +33,8 @@ const initialState = {
   supplierHistory: [],
   supplierSummary: [],
   boosterRecords: [],
-  boosterSummary: []
+  boosterSummary: [],
+  boosterAdjustments: []
 };
 
 export function App() {
@@ -98,14 +99,15 @@ export function App() {
 
   const loadBoosters = useCallback(async (activePermissions = data.permissions) => {
     if (!activePermissions.boosterRecords) {
-      setData((current) => ({ ...current, boosterRecords: [], boosterSummary: [] }));
+      setData((current) => ({ ...current, boosterRecords: [], boosterSummary: [], boosterAdjustments: [] }));
       return;
     }
     const payload = await api("/api/booster-records");
     setData((current) => ({
       ...current,
       boosterRecords: payload.records || [],
-      boosterSummary: payload.summary || []
+      boosterSummary: payload.summary || [],
+      boosterAdjustments: payload.adjustments || []
     }));
   }, [data.permissions]);
 
@@ -144,7 +146,10 @@ export function App() {
             : config.permissions.boosterRecords ? current.boosterRecords : [],
           boosterSummary: boosterPayload
             ? (boosterPayload.summary || [])
-            : config.permissions.boosterRecords ? current.boosterSummary : []
+            : config.permissions.boosterRecords ? current.boosterSummary : [],
+          boosterAdjustments: boosterPayload
+            ? (boosterPayload.adjustments || [])
+            : config.permissions.boosterRecords ? current.boosterAdjustments : []
         };
       });
       if (activeTab === "profit" && config.user?.role === "admin") {
@@ -173,7 +178,8 @@ export function App() {
         supplierHistory: supplierPayload.paidRecords || [],
         supplierSummary: supplierPayload.summary || [],
         boosterRecords: boosterPayload.records || [],
-        boosterSummary: boosterPayload.summary || []
+        boosterSummary: boosterPayload.summary || [],
+        boosterAdjustments: boosterPayload.adjustments || []
       }));
       setActiveTab(config.user?.role === "admin" ? "supplier" : "booster");
     } catch (error) {
@@ -399,9 +405,45 @@ export function App() {
     setData((current) => ({
       ...current,
       boosterRecords: payload.records || [],
-      boosterSummary: payload.summary || []
+      boosterSummary: payload.summary || [],
+      boosterAdjustments: payload.adjustments || current.boosterAdjustments
     }));
     showToast(`${payload.paidCount || rows.length} booster payout rows marked paid.`);
+  });
+
+  const addBoosterAdjustment = (adjustmentData) => runAction(async () => {
+    const payload = await request("/api/booster-adjustments", {
+      method: "POST",
+      body: JSON.stringify(adjustmentData)
+    });
+    setData((current) => ({
+      ...current,
+      boosterAdjustments: payload.adjustments || [payload.adjustment, ...current.boosterAdjustments]
+    }));
+    showToast(`Balance adjustment of ${adjustmentData.type === "add" ? "+" : "-"}${money(adjustmentData.amount)} saved for ${adjustmentData.boosterName}.`);
+  });
+
+  const updateBoosterAdjustment = (id, patch) => runAction(async () => {
+    const payload = await request(`/api/booster-adjustments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch)
+    });
+    setData((current) => ({
+      ...current,
+      boosterAdjustments: payload.adjustments || current.boosterAdjustments.map((a) => (a.id === id ? payload.adjustment : a))
+    }));
+    showToast("Balance adjustment updated.");
+  });
+
+  const deleteBoosterAdjustment = (id) => runAction(async () => {
+    const payload = await request(`/api/booster-adjustments/${id}`, {
+      method: "DELETE"
+    });
+    setData((current) => ({
+      ...current,
+      boosterAdjustments: payload.adjustments || current.boosterAdjustments.filter((a) => a.id !== id)
+    }));
+    showToast("Balance adjustment removed.");
   });
 
   const saveSupplierPrices = (event) => runAction(async () => {
@@ -562,20 +604,25 @@ export function App() {
 
         {activeTab === "booster" && (
           <BoosterPayoutPage
-          isAdmin={isAdmin}
-          user={data.user}
-          loading={loading}
-          loadError={loadError}
-          records={data.boosterRecords}
-          prices={data.boosterPrices}
-          permissions={permissions}
-          editing={editing}
-          formKey={boosterFormKey}
-          onSubmitRecord={submitBoosterRecord}
-          onPatchRecord={patchBoosterRecord}
-          onDeleteRecord={deleteBoosterRecord}
-          onSetEditing={setEditing}
-          onMarkPaid={markBoosterPaid}
+            isAdmin={isAdmin}
+            user={data.user}
+            loading={loading}
+            loadError={loadError}
+            records={data.boosterRecords}
+            adjustments={data.boosterAdjustments}
+            prices={data.boosterPrices}
+            permissions={permissions}
+            editing={editing}
+            formKey={boosterFormKey}
+            onSubmitRecord={submitBoosterRecord}
+            onPatchRecord={patchBoosterRecord}
+            onDeleteRecord={deleteBoosterRecord}
+            onSetEditing={setEditing}
+            onMarkPaid={markBoosterPaid}
+            onAddAdjustment={addBoosterAdjustment}
+            onUpdateAdjustment={updateBoosterAdjustment}
+            onDeleteAdjustment={deleteBoosterAdjustment}
+            onAskConfirm={askConfirm}
           />
         )}
 
