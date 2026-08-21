@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Edit2, Plus, Search, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import { BoosterAdjustmentDialog } from "./BoosterAdjustmentDialog.jsx";
+import { BoosterSettleDialog } from "./BoosterSettleDialog.jsx";
 import { money } from "../../utils/format.js";
 import { calculateBoosterBalances } from "../../utils/boosterBalance.js";
 import { Badge } from "@/components/ui/badge.jsx";
@@ -17,6 +18,7 @@ export function BoosterBalanceTab({
   onAddAdjustment,
   onUpdateAdjustment,
   onDeleteAdjustment,
+  onSettleBooster,
   onAskConfirm
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,6 +26,8 @@ export function BoosterBalanceTab({
   const [dialogMode, setDialogMode] = useState("create"); // "create" | "edit"
   const [selectedBoosterData, setSelectedBoosterData] = useState(null);
   const [editingAdjustment, setEditingAdjustment] = useState(null);
+  const [isSettleOpen, setIsSettleOpen] = useState(false);
+  const [settleBoosterData, setSettleBoosterData] = useState(null);
 
   // Compute aggregated balances per booster
   const boosterBalances = useMemo(
@@ -53,6 +57,18 @@ export function BoosterBalanceTab({
   const totalCurrentBalance = boosterBalances.reduce((sum, b) => sum + b.currentBalance, 0);
   const totalOpenRuns = boosterBalances.reduce((sum, b) => sum + b.openRunsTotal, 0);
   const totalNetAdjustments = boosterBalances.reduce((sum, b) => sum + b.adjustmentsTotal, 0);
+
+  const handleOpenSettleDialog = (booster) => {
+    setSettleBoosterData(booster);
+    setIsSettleOpen(true);
+  };
+
+  const handleConfirmSettle = async (payload) => {
+    if (onSettleBooster) {
+      await onSettleBooster(payload);
+    }
+    setIsSettleOpen(false);
+  };
 
   const handleOpenCreateDialog = (booster = null) => {
     setDialogMode("create");
@@ -204,16 +220,45 @@ export function BoosterBalanceTab({
                     </td>
                     <td className="px-4 py-3 text-right pr-4">
                       {isAdmin && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          className="h-7 px-2 text-xs font-semibold border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
-                          onClick={() => handleOpenCreateDialog(b)}
-                          disabled={!permissions.canMarkBoosterPaid}
-                        >
-                          + / - Adjust
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {b.currentBalance > 0 ? (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              type="button"
+                              className="h-7 px-2.5 text-xs font-bold shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white"
+                              onClick={() => handleOpenSettleDialog(b)}
+                              disabled={!permissions.canMarkBoosterPaid}
+                            >
+                              Pay Balance
+                            </Button>
+                          ) : b.currentBalance < 0 && b.openRunsCount > 0 ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              className="h-7 px-2.5 text-xs font-semibold border-rose-500/40 text-rose-300 bg-rose-500/10 hover:bg-rose-500/20"
+                              onClick={() => handleOpenSettleDialog(b)}
+                              disabled={!permissions.canMarkBoosterPaid}
+                            >
+                              Offset Runs
+                            </Button>
+                          ) : (
+                            <Badge variant="neutral" className="text-[10px] py-0.5 px-2 font-mono">
+                              Settled
+                            </Badge>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            className="h-7 px-2 text-xs font-semibold border-border/80 bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                            onClick={() => handleOpenCreateDialog(b)}
+                            disabled={!permissions.canMarkBoosterPaid}
+                          >
+                            + / - Adjust
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -335,6 +380,16 @@ export function BoosterBalanceTab({
         boosters={boosterBalances}
         onSave={handleSaveDialog}
         onClose={() => setIsDialogOpen(false)}
+      />
+
+      {/* Settle Booster Payout Dialog */}
+      <BoosterSettleDialog
+        isOpen={isSettleOpen}
+        booster={settleBoosterData}
+        records={records}
+        adjustments={adjustments}
+        onConfirm={handleConfirmSettle}
+        onClose={() => setIsSettleOpen(false)}
       />
     </section>
   );

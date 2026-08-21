@@ -23,6 +23,7 @@ import {
   updateBoosterRecord,
   deleteBoosterRecord,
   markBoosterRecordsPaid,
+  settleBoosterBalance,
   getBoosterAdjustmentsPayload,
   insertBoosterAdjustment,
   getBoosterAdjustmentById,
@@ -510,6 +511,31 @@ async function handleApi(req, res, url) {
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
     return sendJson(res, 200, {
       paidCount: result.paidCount,
+      boosterPaymentBatchId: result.boosterPaymentBatchId,
+      records,
+      summary,
+      adjustments
+    });
+  }
+
+  if (pathname === "/api/booster-records/settle" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can settle booster payouts.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const discordId = String(body.discordId || "").trim();
+    const boosterName = String(body.boosterName || "").trim();
+    if (!discordId && !boosterName) {
+      return sendJson(res, 400, { error: "Booster name or ID is required for settlement." });
+    }
+
+    const result = await settleBoosterBalance({ discordId, boosterName }, session);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+
+    const { records, summary } = await getBoosterRecordsPayload(session, true);
+    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+    return sendJson(res, 200, {
+      settledCount: result.settledCount,
+      netPayoutAmount: result.netPayoutAmount,
       boosterPaymentBatchId: result.boosterPaymentBatchId,
       records,
       summary,

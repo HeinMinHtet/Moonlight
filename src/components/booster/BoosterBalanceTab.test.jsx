@@ -153,4 +153,59 @@ describe("BoosterBalanceTab", () => {
     expect(props.onAskConfirm).toHaveBeenCalled();
     expect(props.onDeleteAdjustment).toHaveBeenCalledWith("a1");
   });
+
+  it("opens settle dialog on 'Pay Balance' click and confirms payout", async () => {
+    const user = userEvent.setup();
+    const props = renderTab({ onSettleBooster: vi.fn() });
+
+    // Alice has balance 280 (positive) => has Pay Balance button
+    const payBtn = screen.getAllByRole("button", { name: "Pay Balance" })[0];
+    await user.click(payBtn);
+
+    expect(screen.getByRole("heading", { name: "Settle Booster Payout" })).toBeInTheDocument();
+    expect(screen.getByText("Ready to Pay")).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole("button", { name: new RegExp(`Confirm Payout \\(${money(280)}\\)`, "i") });
+    expect(confirmBtn).toBeInTheDocument();
+
+    await user.click(confirmBtn);
+    expect(props.onSettleBooster).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boosterName: "Alice"
+      })
+    );
+  });
+
+  it("opens settle dialog on 'Offset Runs' click for deficit booster", async () => {
+    const user = userEvent.setup();
+    const deficitRecords = [
+      { id: "r10", discordId: "d3", boosterName: "Charlie", totalBalance: 40, paid: false }
+    ];
+    const deficitAdjustments = [
+      { id: "a10", discordId: "d3", boosterName: "Charlie", type: "deduct", amount: 100, note: "Loan" }
+    ];
+    const props = renderTab({
+      records: deficitRecords,
+      adjustments: deficitAdjustments,
+      onSettleBooster: vi.fn()
+    });
+
+    // Charlie has 40 open runs, -100 adjustment => balance -60 => has Offset Runs button
+    const offsetBtn = screen.getByRole("button", { name: "Offset Runs" });
+    await user.click(offsetBtn);
+
+    expect(screen.getByRole("heading", { name: "Settle Booster Payout" })).toBeInTheDocument();
+    expect(screen.getByText("Booster is in Deficit")).toBeInTheDocument();
+    expect(screen.getByText(/No gold will be traded in-game/i)).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole("button", { name: new RegExp(`Offset Runs to Debt \\(${money(40)}\\)`, "i") });
+    await user.click(confirmBtn);
+
+    expect(props.onSettleBooster).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boosterName: "Charlie"
+      })
+    );
+  });
 });
+

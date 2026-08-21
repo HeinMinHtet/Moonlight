@@ -36,7 +36,7 @@ export function calculateBoosterBalances(records = [], adjustments = []) {
     }
   }
 
-  // 2. Process manual balance adjustments
+  // 2. Process manual balance adjustments (active vs settled)
   for (const adj of adjustments) {
     const key = adj.discordId || adj.boosterName || "unknown";
     if (!boosterMap.has(key)) {
@@ -58,28 +58,69 @@ export function calculateBoosterBalances(records = [], adjustments = []) {
 
     const item = boosterMap.get(key);
     const amount = Number(adj.amount || 0);
-    item.adjustmentsCount += 1;
-    if (adj.type === "deduct") {
-      item.adjustmentsTotal -= amount;
-      item.deductAdjustmentsTotal += amount;
-    } else {
-      item.adjustmentsTotal += amount;
-      item.addAdjustmentsTotal += amount;
+    const isSettled = Boolean(adj.settled);
+
+    // Lifetime earned includes all credit adjustments (active and settled)
+    if (adj.type === "add") {
+      item.lifetimeEarned += amount;
+    }
+
+    // Only active (unsettled) adjustments affect current balance
+    if (!isSettled) {
+      item.adjustmentsCount += 1;
+      if (adj.type === "deduct") {
+        item.adjustmentsTotal -= amount;
+        item.deductAdjustmentsTotal += amount;
+      } else {
+        item.adjustmentsTotal += amount;
+        item.addAdjustmentsTotal += amount;
+      }
     }
   }
 
   // 3. Compute final current balance and lifetime earned
   const result = [];
   for (const item of boosterMap.values()) {
-    // Current Balance = Unpaid Runs + Net Adjustments (Credits - Debits)
+    // Current Balance = Unpaid Runs + Net Active Adjustments (Credits - Debits)
     item.currentBalance = item.openRunsTotal + item.adjustmentsTotal;
-    // Lifetime Earned = All Runs + Add (Credit) Adjustments
-    item.lifetimeEarned = item.openRunsTotal + item.paidRunsTotal + item.addAdjustmentsTotal;
+    // Lifetime Earned = All Runs (open + paid) + Lifetime Credit Adjustments
+    item.lifetimeEarned += item.openRunsTotal + item.paidRunsTotal;
     result.push(item);
   }
 
   // Sort by current balance descending, then by booster name
   return result.sort((a, b) => b.currentBalance - a.currentBalance || a.boosterName.localeCompare(b.boosterName));
+}
+
+export function calculateBoosterSettlement(boosterSummary, openRecords = [], activeAdjustments = []) {
+  const openRunsTotal = openRecords.reduce((sum, r) => sum + Number(r.totalBalance || 0), 0);
+  const addAdjustments = activeAdjustments.filter((a) => a.type === "add" && !a.settled);
+  const deductAdjustments = activeAdjustments.filter((a) => a.type === "deduct" && !a.settled);
+
+  const addAdjustmentsTotal = addAdjustments.reduce((sum, a) => sum + Number(a.amount || 0), 0);
+  const deductAdjustmentsTotal = deductAdjustments.reduce((sum, a) => sum + Number(a.amount || 0), 0);
+  const netAdjustmentsTotal = addAdjustmentsTotal - deductAdjustmentsTotal;
+
+  const currentBalance = openRunsTotal + netAdjustmentsTotal;
+  const isDeficit = currentBalance < 0;
+  const netPayoutAmount = Math.max(0, currentBalance);
+  const debtOffsetAmount = isDeficit ? openRunsTotal : deductAdjustmentsTotal;
+  const remainingDebt = isDeficit ? Math.abs(currentBalance) : 0;
+
+  return {
+    openRunsCount: openRecords.length,
+    openRunsTotal,
+    addAdjustmentsCount: addAdjustments.length,
+    addAdjustmentsTotal,
+    deductAdjustmentsCount: deductAdjustments.length,
+    deductAdjustmentsTotal,
+    netAdjustmentsTotal,
+    currentBalance,
+    isDeficit,
+    netPayoutAmount,
+    debtOffsetAmount,
+    remainingDebt
+  };
 }
 
 export function validateAdjustmentPayload({ boosterName, type, amount, note, date }) {

@@ -39,6 +39,7 @@ export function BoosterPayoutPage({
   onAddAdjustment,
   onUpdateAdjustment,
   onDeleteAdjustment,
+  onSettleBooster,
   onAskConfirm
 }) {
   const [filters, setFilters] = useState(filterDefaults);
@@ -267,6 +268,7 @@ export function BoosterPayoutPage({
                   onAddAdjustment={onAddAdjustment}
                   onUpdateAdjustment={onUpdateAdjustment}
                   onDeleteAdjustment={onDeleteAdjustment}
+                  onSettleBooster={onSettleBooster}
                   onAskConfirm={onAskConfirm}
                 />
               ) : (

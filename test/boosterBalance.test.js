@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateBoosterBalances, validateAdjustmentPayload } from "../src/utils/boosterBalance.js";
+import { calculateBoosterBalances, calculateBoosterSettlement, validateAdjustmentPayload } from "../src/utils/boosterBalance.js";
 
 test("calculateBoosterBalances accurately sums open runs, paid runs, and adjustments", () => {
   const mockRecords = [
@@ -110,3 +110,64 @@ test("validateAdjustmentPayload accepts valid data and rejects invalid inputs", 
     });
   }, /Date must be in YYYY-MM-DD format/);
 });
+
+test("calculateBoosterBalances excludes settled adjustments from current balance but retains them in lifetime earned", () => {
+  const records = [
+    { id: "r1", discordId: "d1", boosterName: "Alice", totalBalance: 100, paid: false }
+  ];
+  const adjustments = [
+    { id: "a1", discordId: "d1", boosterName: "Alice", type: "add", amount: 50, settled: true, note: "Old bonus" },
+    { id: "a2", discordId: "d1", boosterName: "Alice", type: "deduct", amount: 30, settled: true, note: "Old loan" },
+    { id: "a3", discordId: "d1", boosterName: "Alice", type: "deduct", amount: 20, settled: false, note: "Active penalty" }
+  ];
+
+  const balances = calculateBoosterBalances(records, adjustments);
+  const alice = balances.find((b) => b.discordId === "d1");
+  assert.ok(alice);
+  // Open runs = 100, Active adjustments = -20. Current balance = 80
+  assert.equal(alice.openRunsTotal, 100);
+  assert.equal(alice.adjustmentsTotal, -20);
+  assert.equal(alice.currentBalance, 80);
+  assert.equal(alice.adjustmentsCount, 1);
+  // Lifetime earned = 100 (open runs) + 50 (lifetime credit adjustments) = 150
+  assert.equal(alice.lifetimeEarned, 150);
+});
+
+test("calculateBoosterSettlement handles positive balance and deficit settlement correctly", () => {
+  // Case 1: Positive balance (100k runs, -30k debt, +10k bonus => Net Payout = 80k)
+  const openRuns1 = [
+    { id: "r1", totalBalance: 60 },
+    { id: "r2", totalBalance: 40 }
+  ];
+  const adjustments1 = [
+    { id: "a1", type: "deduct", amount: 30, settled: false },
+    { id: "a2", type: "add", amount: 10, settled: false }
+  ];
+  const res1 = calculateBoosterSettlement({ boosterName: "Alex" }, openRuns1, adjustments1);
+  assert.equal(res1.openRunsTotal, 100);
+  assert.equal(res1.addAdjustmentsTotal, 10);
+  assert.equal(res1.deductAdjustmentsTotal, 30);
+  assert.equal(res1.netAdjustmentsTotal, -20);
+  assert.equal(res1.currentBalance, 80);
+  assert.equal(res1.isDeficit, false);
+  assert.equal(res1.netPayoutAmount, 80);
+  assert.equal(res1.debtOffsetAmount, 30);
+  assert.equal(res1.remainingDebt, 0);
+
+  // Case 2: Deficit (40k runs, -100k debt => Net Payout = 0, Debt offset = 40k, Remaining debt = 60k)
+  const openRuns2 = [
+    { id: "r3", totalBalance: 40 }
+  ];
+  const adjustments2 = [
+    { id: "a3", type: "deduct", amount: 100, settled: false }
+  ];
+  const res2 = calculateBoosterSettlement({ boosterName: "Sarah" }, openRuns2, adjustments2);
+  assert.equal(res2.openRunsTotal, 40);
+  assert.equal(res2.netAdjustmentsTotal, -100);
+  assert.equal(res2.currentBalance, -60);
+  assert.equal(res2.isDeficit, true);
+  assert.equal(res2.netPayoutAmount, 0);
+  assert.equal(res2.debtOffsetAmount, 40);
+  assert.equal(res2.remainingDebt, 60);
+});
+

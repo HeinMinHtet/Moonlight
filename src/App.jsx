@@ -411,6 +411,23 @@ export function App() {
     showToast(`${payload.paidCount || rows.length} booster payout rows marked paid.`);
   });
 
+  const settleBooster = (boosterData) => runAction(async () => {
+    const payload = await request("/api/booster-records/settle", {
+      method: "POST",
+      body: JSON.stringify(boosterData)
+    });
+    setData((current) => ({
+      ...current,
+      boosterRecords: payload.records || [],
+      boosterSummary: payload.summary || [],
+      boosterAdjustments: payload.adjustments || current.boosterAdjustments
+    }));
+    const message = payload.netPayoutAmount > 0
+      ? `Settlement complete. Paid ${money(payload.netPayoutAmount)} (${payload.settledCount} runs settled).`
+      : `Settlement complete. ${payload.settledCount} runs applied to offset debt.`;
+    showToast(message);
+  });
+
   const addBoosterAdjustment = (adjustmentData) => runAction(async () => {
     const payload = await request("/api/booster-adjustments", {
       method: "POST",
@@ -619,6 +636,7 @@ export function App() {
             onDeleteRecord={deleteBoosterRecord}
             onSetEditing={setEditing}
             onMarkPaid={markBoosterPaid}
+            onSettleBooster={settleBooster}
             onAddAdjustment={addBoosterAdjustment}
             onUpdateAdjustment={updateBoosterAdjustment}
             onDeleteAdjustment={deleteBoosterAdjustment}
