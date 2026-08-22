@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { money } from "../../utils/format.js";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -14,16 +14,22 @@ export function BoosterAdjustmentDialog({
   onSave,
   onClose
 }) {
-  const [boosterName, setBoosterName] = useState("");
-  const [discordId, setDiscordId] = useState("");
-  const [type, setType] = useState("add"); // "add" | "deduct"
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [boosterName, setBoosterName] = useState(() => initialData?.boosterName || boosters[0]?.boosterName || "");
+  const [discordId, setDiscordId] = useState(() => initialData?.discordId || boosters[0]?.discordId || "");
+  const [type, setType] = useState(() => initialData?.type || "add"); // "add" | "deduct"
+  const [amount, setAmount] = useState(() => (initialData?.amount != null ? String(initialData.amount) : ""));
+  const [note, setNote] = useState(() => initialData?.note || "");
+  const [date, setDate] = useState(() => initialData?.date || new Date().toISOString().slice(0, 10));
   const [error, setError] = useState("");
 
+  const prevIsOpenRef = useRef(isOpen);
+  const prevInitialDataRef = useRef(initialData);
+
   useEffect(() => {
-    if (isOpen) {
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    const initialDataChanged = isOpen && initialData !== prevInitialDataRef.current;
+
+    if (justOpened || initialDataChanged) {
       if (initialData) {
         setBoosterName(initialData.boosterName || "");
         setDiscordId(initialData.discordId || "");
@@ -41,6 +47,8 @@ export function BoosterAdjustmentDialog({
       }
       setError("");
     }
+    prevIsOpenRef.current = isOpen;
+    prevInitialDataRef.current = initialData;
   }, [isOpen, initialData, boosters]);
 
   if (!isOpen) return null;

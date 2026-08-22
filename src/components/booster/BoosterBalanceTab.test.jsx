@@ -207,5 +207,48 @@ describe("BoosterBalanceTab", () => {
       })
     );
   });
+
+  it("preserves user form input in Add / Deduct dialog when background data refreshes", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <BoosterBalanceTab
+        records={mockRecords}
+        adjustments={mockAdjustments}
+        isAdmin={true}
+        permissions={{ canMarkBoosterPaid: true }}
+        onAddAdjustment={vi.fn()}
+      />
+    );
+
+    const addBtn = screen.getByRole("button", { name: /Add \/ Deduct Balance/i });
+    await user.click(addBtn);
+
+    expect(screen.getByRole("heading", { name: "Add / Deduct Booster Balance" })).toBeInTheDocument();
+
+    const amountInput = screen.getByPlaceholderText("0.00");
+    await user.type(amountInput, "123.45");
+
+    const noteInput = screen.getByPlaceholderText(/e\.g\. Weekly performance bonus/i);
+    await user.type(noteInput, "Work in progress bonus note");
+
+    expect(amountInput).toHaveValue(123.45);
+    expect(noteInput).toHaveValue("Work in progress bonus note");
+
+    // Simulate background polling update (new records/adjustments array references with new data)
+    rerender(
+      <BoosterBalanceTab
+        records={[...mockRecords, { id: "r99", discordId: "d1", boosterName: "Alice", totalBalance: 500, paid: false }]}
+        adjustments={[...mockAdjustments]}
+        isAdmin={true}
+        permissions={{ canMarkBoosterPaid: true }}
+        onAddAdjustment={vi.fn()}
+      />
+    );
+
+    // Form inputs must remain preserved and NOT reset by polling
+    expect(screen.getByRole("heading", { name: "Add / Deduct Booster Balance" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("0.00")).toHaveValue(123.45);
+    expect(screen.getByPlaceholderText(/e\.g\. Weekly performance bonus/i)).toHaveValue("Work in progress bonus note");
+  });
 });
 

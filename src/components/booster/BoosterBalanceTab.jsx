@@ -373,14 +373,16 @@ export function BoosterBalanceTab({
       </Card>
 
       {/* Create / Edit Dialog */}
-      <BoosterAdjustmentDialog
-        isOpen={isDialogOpen}
-        mode={dialogMode}
-        initialData={dialogMode === "edit" ? editingAdjustment : selectedBoosterData}
-        boosters={boosterBalances}
-        onSave={handleSaveDialog}
-        onClose={() => setIsDialogOpen(false)}
-      />
+      {isDialogOpen && (
+        <BoosterAdjustmentDialog
+          isOpen={isDialogOpen}
+          mode={dialogMode}
+          initialData={dialogMode === "edit" ? editingAdjustment : selectedBoosterData}
+          boosters={boosterBalances}
+          onSave={handleSaveDialog}
+          onClose={() => setIsDialogOpen(false)}
+        />
+      )}
 
       {/* Settle Booster Payout Dialog */}
       <BoosterSettleDialog

@@ -114,4 +114,33 @@ describe("SupplierUnpaidPage", () => {
 
     expect(onPatchRecord).toHaveBeenCalledWith("review-row", { correct: true });
   });
+
+  it("keeps focus while typing in inline edit fields in supplier table", async () => {
+    const user = userEvent.setup();
+    const handlePatch = vi.fn();
+    renderPage({
+      editing: { scope: "supplier", id: "verified-row" },
+      onPatchRecord: handlePatch
+    });
+
+    const buyerInput = screen.getByDisplayValue("Verifiedbuyer");
+    expect(buyerInput).toBeInTheDocument();
+
+    await user.clear(buyerInput);
+    await user.type(buyerInput, "NewBuyerName");
+
+    // Verify input retains focus during continuous typing
+    expect(document.activeElement).toBe(buyerInput);
+    expect(buyerInput).toHaveValue("NewBuyerName");
+
+    const saveBtn = screen.getByRole("button", { name: "Save" });
+    await user.click(saveBtn);
+
+    expect(handlePatch).toHaveBeenCalledWith(
+      "verified-row",
+      expect.objectContaining({
+        buyerName: "NewBuyerName"
+      })
+    );
+  });
 });

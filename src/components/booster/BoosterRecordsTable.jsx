@@ -79,9 +79,12 @@ export function BoosterRecordsTable({
     {
       accessorKey: "createdAt",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Date" className={centeredHeader} />,
-      cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field mx-auto w-32 text-center" type="date" value={draft.createdAt || ""} onChange={(event) => setDraft((current) => ({ ...current, createdAt: event.target.value }))} />
-        : <span className="font-mono tabular-nums">{dateOnly(getValue())}</span>,
+      cell: ({ row, getValue, table }) => {
+        const { draft, setDraft, editing } = table.options.meta;
+        return isEditing(row.original, editing)
+          ? <Input className="table-edit-field mx-auto w-32 text-center" type="date" value={draft.createdAt || ""} onChange={(event) => setDraft((current) => ({ ...current, createdAt: event.target.value }))} />
+          : <span className="font-mono tabular-nums">{dateOnly(getValue())}</span>;
+      },
       meta: { label: "Date", headClassName: "w-36 text-center", cellClassName: "w-36 text-center" }
     },
     ...(isAdmin ? [{
@@ -92,28 +95,37 @@ export function BoosterRecordsTable({
     {
       accessorKey: "level",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Key level" className={centeredHeader} />,
-      cell: ({ row, getValue }) => isEditing(row.original, editing) ? (
-        <NativeSelect className="table-edit-field mx-auto w-32 text-center" value={draft.level || ""} onChange={(event) => setDraft((current) => ({ ...current, level: event.target.value }))}>
-          {withCurrent(prices.map((price) => price.level), row.original.level).map((value) => <option key={value} value={value}>{value}</option>)}
-        </NativeSelect>
-      ) : getValue(),
+      cell: ({ row, getValue, table }) => {
+        const { draft, setDraft, editing, prices } = table.options.meta;
+        return isEditing(row.original, editing) ? (
+          <NativeSelect className="table-edit-field mx-auto w-32 text-center" value={draft.level || ""} onChange={(event) => setDraft((current) => ({ ...current, level: event.target.value }))}>
+            {withCurrent(prices.map((price) => price.level), row.original.level).map((value) => <option key={value} value={value}>{value}</option>)}
+          </NativeSelect>
+        ) : getValue();
+      },
       meta: { label: "Key level", headClassName: centeredCell, cellClassName: centeredCell }
     },
     {
       accessorKey: "quantity",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Runs" className={centeredHeader} />,
-      cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field mx-auto w-24 text-center font-mono tabular-nums" type="number" min="1" step="1" value={draft.quantity ?? 1} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} />
-        : <span className="font-mono tabular-nums">{getValue()}</span>,
+      cell: ({ row, getValue, table }) => {
+        const { draft, setDraft, editing } = table.options.meta;
+        return isEditing(row.original, editing)
+          ? <Input className="table-edit-field mx-auto w-24 text-center font-mono tabular-nums" type="number" min="1" step="1" value={draft.quantity ?? 1} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} />
+          : <span className="font-mono tabular-nums">{getValue()}</span>;
+      },
       sortingFn: "basic",
       meta: { label: "Runs", headClassName: "w-24 text-center", cellClassName: numericCell }
     },
     {
       accessorKey: "rateAtRecord",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Saved rate" className={centeredHeader} />,
-      cell: ({ row, getValue }) => isEditing(row.original, editing) && isAdmin
-        ? <Input className="table-edit-field mx-auto w-28 text-center font-mono tabular-nums" type="number" min="0" step="0.01" value={draft.rateAtRecord ?? 0} onChange={(event) => setDraft((current) => ({ ...current, rateAtRecord: event.target.value }))} />
-        : <span className="font-mono tabular-nums">{money(getValue())}</span>,
+      cell: ({ row, getValue, table }) => {
+        const { draft, setDraft, editing, isAdmin: isTableAdmin } = table.options.meta;
+        return isEditing(row.original, editing) && isTableAdmin
+          ? <Input className="table-edit-field mx-auto w-28 text-center font-mono tabular-nums" type="number" min="0" step="0.01" value={draft.rateAtRecord ?? 0} onChange={(event) => setDraft((current) => ({ ...current, rateAtRecord: event.target.value }))} />
+          : <span className="font-mono tabular-nums">{money(getValue())}</span>;
+      },
       sortingFn: "basic",
       meta: { label: "Saved rate", headClassName: "w-32 text-center", cellClassName: numericCell }
     },
@@ -140,9 +152,12 @@ export function BoosterRecordsTable({
     {
       accessorKey: "note",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Note" className={centeredHeader} />,
-      cell: ({ row, getValue }) => isEditing(row.original, editing)
-        ? <Input className="table-edit-field mx-auto w-48 text-center" value={draft.note || ""} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} />
-        : <span className="mx-auto block max-w-60 truncate text-center" title={getValue() || ""}>{getValue() || "—"}</span>,
+      cell: ({ row, getValue, table }) => {
+        const { draft, setDraft, editing } = table.options.meta;
+        return isEditing(row.original, editing)
+          ? <Input className="table-edit-field mx-auto w-48 text-center" value={draft.note || ""} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} />
+          : <span className="mx-auto block max-w-60 truncate text-center" title={getValue() || ""}>{getValue() || "—"}</span>;
+      },
       meta: { label: "Note", headClassName: centeredCell, cellClassName: centeredCell }
     },
     {
@@ -150,31 +165,44 @@ export function BoosterRecordsTable({
       header: "Manage",
       enableSorting: false,
       enableHiding: false,
-      cell: ({ row }) => {
-        const canManageOwnOpenRow = permissions.canDeleteBoosterRows && (isAdmin || (!row.original.paid && row.original.discordId === user?.discordId));
+      cell: ({ row, table }) => {
+        const { draft, editing, isAdmin: isTableAdmin, permissions: tablePerms, user: tableUser, onPatchRecord: patchFn, onSetEditing: setEditFn, onDeleteRecord: deleteFn } = table.options.meta;
+        const canManageOwnOpenRow = tablePerms.canDeleteBoosterRows && (isTableAdmin || (!row.original.paid && row.original.discordId === tableUser?.discordId));
         if (isEditing(row.original, editing)) {
           return (
             <div className="flex justify-center gap-2">
-              <Button size="sm" onClick={() => onPatchRecord(row.original.id, isAdmin ? draft : withoutKey(draft, "rateAtRecord"))}>Save changes</Button>
-              <Button variant="outline" size="sm" onClick={() => onSetEditing(null)}>Cancel</Button>
+              <Button size="sm" onClick={() => patchFn(row.original.id, isTableAdmin ? draft : withoutKey(draft, "rateAtRecord"))}>Save changes</Button>
+              <Button variant="outline" size="sm" onClick={() => setEditFn(null)}>Cancel</Button>
             </div>
           );
         }
         return (
           <div className="flex justify-center gap-2">
-            {canManageOwnOpenRow && <Button variant="outline" size="sm" onClick={() => onSetEditing({ scope: "booster", id: row.original.id })}>Edit</Button>}
-            {canManageOwnOpenRow && <Button variant="destructive" size="sm" onClick={() => onDeleteRecord(row.original)}>Delete</Button>}
+            {canManageOwnOpenRow && <Button variant="outline" size="sm" onClick={() => setEditFn({ scope: "booster", id: row.original.id })}>Edit</Button>}
+            {canManageOwnOpenRow && <Button variant="destructive" size="sm" onClick={() => deleteFn(row.original)}>Delete</Button>}
           </div>
         );
       },
       meta: { headClassName: "w-44 text-center", cellClassName: actionCell }
     }
-  ], [draft, editing, isAdmin, onDeleteRecord, onPatchRecord, onSetEditing, permissions, prices, user]);
+  ], [isAdmin]);
 
   const table = useReactTable({
     data: records,
     columns,
     state: { sorting, pagination, columnVisibility, rowSelection },
+    meta: {
+      draft,
+      setDraft,
+      editing,
+      isAdmin,
+      permissions,
+      prices,
+      user,
+      onPatchRecord,
+      onDeleteRecord,
+      onSetEditing
+    },
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
     onColumnVisibilityChange: setColumnVisibility,
