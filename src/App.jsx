@@ -294,6 +294,28 @@ export function App() {
     showToast("Sales record deleted.");
   });
 
+  const verifyAllSupplierSales = (unverifiedRows) => runAction(async () => {
+    const rowsToVerify = unverifiedRows || data.supplierRecords.filter((record) => !record.correct && !record.paid);
+    if (!rowsToVerify.length) return showToast("No unverified unpaid sales to verify.");
+    const confirmed = await askConfirm({
+      title: "Verify all unpaid sales?",
+      body: `${rowsToVerify.length} unverified sales record${rowsToVerify.length === 1 ? "" : "s"} will be marked as verified.`,
+      confirmLabel: "Verify all"
+    });
+    if (!confirmed) return;
+    const payload = await request("/api/supplier-records/verify-all", {
+      method: "POST",
+      body: JSON.stringify({ ids: rowsToVerify.map((record) => record.id) })
+    });
+    setData((current) => ({
+      ...current,
+      supplierRecords: payload.records || [],
+      supplierHistory: payload.paidRecords || [],
+      supplierSummary: payload.summary || []
+    }));
+    showToast(`${payload.verifiedCount || rowsToVerify.length} sales records marked verified.`);
+  });
+
   const markSupplierPaid = (batchRows = verifiedUnpaidSupplierRows) => runAction(async () => {
     const total = batchRows.reduce((sum, record) => sum + Number(record.totalCost || 0), 0);
     if (!batchRows.length) return showToast("No verified unpaid sales to mark paid.");
@@ -603,6 +625,7 @@ export function App() {
           onDeleteRecord={deleteSupplierRecord}
           onSetEditing={setEditing}
           onExport={exportSupplierPng}
+          onVerifyAll={verifyAllSupplierSales}
           onMarkPaid={markSupplierPaid}
           />
         )}

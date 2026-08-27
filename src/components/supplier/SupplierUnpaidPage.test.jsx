@@ -15,15 +15,19 @@ const verifiedRecord = {
   correct: true,
   paid: false,
   totalCost: 100,
-  note: ""
+  note: "VIP Buyer"
 };
 
 const reviewRecord = {
   ...verifiedRecord,
   id: "review-row",
+  date: "2026-08-25",
   buyerName: "Reviewbuyer",
+  serviceType: "Raid",
+  armorType: "Plate",
   correct: false,
-  totalCost: 200
+  totalCost: 200,
+  note: ""
 };
 
 function renderPage(overrides = {}) {
@@ -32,8 +36,11 @@ function renderPage(overrides = {}) {
     loading: false,
     loadError: "",
     records: [verifiedRecord, reviewRecord],
-    services: [{ type: "Mythic+", price: 100, active: true }],
-    armorTypes: ["Cloth"],
+    services: [
+      { type: "Mythic+", price: 100, active: true },
+      { type: "Raid", price: 200, active: true }
+    ],
+    armorTypes: ["Cloth", "Plate"],
     paidHistory: [],
     permissions: {
       canUseSupplier: true,
@@ -48,6 +55,7 @@ function renderPage(overrides = {}) {
     onDeleteRecord: vi.fn(),
     onSetEditing: vi.fn(),
     onExport: vi.fn(),
+    onVerifyAll: vi.fn(),
     onMarkPaid: vi.fn(),
     ...overrides
   };
@@ -57,21 +65,81 @@ function renderPage(overrides = {}) {
 }
 
 describe("SupplierUnpaidPage", () => {
-  it("places the batch actions in the summary and removes the page header and filters", () => {
+  it("renders summary actions including verify all, export, mark paid, and the filter bar", () => {
     renderPage();
 
     const summaryPanel = screen.getByRole("heading", { name: "Verified unpaid total" }).closest("aside");
     const recordsWorkspace = screen.getByRole("region", { name: "Supplier records workspace" });
 
-    expect(screen.queryByRole("heading", { name: "Unpaid sales records" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Supplier record filters")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
-    expect(summaryPanel?.nextElementSibling).toBe(recordsWorkspace);
+    expect(within(summaryPanel).getByRole("button", { name: /Verify all unpaid \(1\)/i })).toBeInTheDocument();
     expect(within(summaryPanel).getByRole("button", { name: "Export batch PNG" })).toBeInTheDocument();
     expect(within(summaryPanel).getByRole("button", { name: "Mark batch paid" })).toBeInTheDocument();
     expect(within(summaryPanel).getByText("2 unpaid")).toBeInTheDocument();
+
+    const filterBar = screen.getByRole("region", { name: "Supplier record filters" });
+    expect(filterBar).toBeInTheDocument();
+    expect(within(filterBar).getByPlaceholderText("Buyer, note, service...")).toBeInTheDocument();
+    expect(within(filterBar).getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     expect(within(recordsWorkspace).getByRole("button", { name: "Record sale" })).toBeInTheDocument();
     expect(within(recordsWorkspace).getByRole("columnheader", { name: "Buyer" })).toBeInTheDocument();
+  });
+
+  it("filters sales records by search text and status", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByText("Verifiedbuyer")).toBeInTheDocument();
+    expect(screen.getByText("Reviewbuyer")).toBeInTheDocument();
+
+    // Filter by search text
+    const searchInput = screen.getByPlaceholderText("Buyer, note, service...");
+    await user.type(searchInput, "Verified");
+
+    expect(screen.getByText("Verifiedbuyer")).toBeInTheDocument();
+    expect(screen.queryByText("Reviewbuyer")).not.toBeInTheDocument();
+
+    // Clear search
+    await user.clear(searchInput);
+    expect(screen.getByText("Reviewbuyer")).toBeInTheDocument();
+
+    // Filter by status unverified
+    const statusSelect = screen.getByRole("combobox", { name: /status/i });
+    await user.selectOptions(statusSelect, "unverified");
+
+    expect(screen.queryByText("Verifiedbuyer")).not.toBeInTheDocument();
+    expect(screen.getByText("Reviewbuyer")).toBeInTheDocument();
+  });
+
+  it("triggers 1-click verify all unpaid sales when clicking verify all button", async () => {
+    const user = userEvent.setup();
+    const { onVerifyAll } = renderPage();
+
+    const verifyAllBtn = screen.getByRole("button", { name: /Verify all unpaid \(1\)/i });
+    await user.click(verifyAllBtn);
+
+    expect(onVerifyAll).toHaveBeenCalledOnce();
+    expect(onVerifyAll.mock.calls[0][0]).toEqual([reviewRecord]);
+  });
+
+  it("opens the export dialog and performs instant export or date range export", async () => {
+    const user = userEvent.setup();
+    const { onExport } = renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Export batch PNG" }));
+
+    // Export dialog should now be open
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Export Supplier Batch PNG" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Instant Export (All Verified)" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Date Range Export" })).toBeInTheDocument();
+
+    // Instant export action
+    const instantBtn = within(dialog).getByRole("button", { name: /Instant Export All \(1\)/i });
+    await user.click(instantBtn);
+
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(onExport.mock.calls[0][0]).toEqual([verifiedRecord]);
   });
 
   it("keeps the summary visible while the grouped records workspace is loading", () => {
@@ -82,19 +150,6 @@ describe("SupplierUnpaidPage", () => {
     expect(screen.getByRole("heading", { name: "Verified unpaid total" })).toBeInTheDocument();
     expect(within(recordsWorkspace).getByLabelText("Loading unpaid sales records")).toBeInTheDocument();
     expect(within(recordsWorkspace).queryByRole("button", { name: "Record sale" })).not.toBeInTheDocument();
-  });
-
-  it("exports all verified unpaid rows without a separate batch checkbox", async () => {
-    const user = userEvent.setup();
-    const { onExport } = renderPage();
-
-    expect(screen.queryByRole("checkbox", { name: /include .* in payout batch/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Mark Verifiedbuyer verified" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Export batch PNG" }));
-
-    expect(onExport).toHaveBeenCalledOnce();
-    expect(onExport.mock.calls[0][0]).toEqual([verifiedRecord]);
   });
 
   it("uses checkbox-only verification controls without status badges", async () => {

@@ -15,6 +15,7 @@ import {
   insertSupplierRecord,
   updateSupplierRecord,
   deleteSupplierRecord,
+  verifyAllSupplierRecords,
   markSupplierRecordsPaid,
   reopenSupplierPaymentBatch,
   getBoosterRecordsPayload,
@@ -361,6 +362,21 @@ async function handleApi(req, res, url) {
     await insertSupplierRecord(record);
     const { summary } = await getSupplierRecordsPayload();
     return sendJson(res, 201, { record, summary });
+  }
+
+  if (pathname === "/api/supplier-records/verify-all" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can verify sales records.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const selectedIds = Array.isArray(body.ids)
+      ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
+      : null;
+
+    const result = await verifyAllSupplierRecords(selectedIds);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+
+    const { records, paidRecords, summary } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { verifiedCount: result.verifiedCount, records, paidRecords, summary });
   }
 
   if (pathname === "/api/supplier-records/mark-paid" && req.method === "POST") {
