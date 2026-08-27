@@ -79,9 +79,10 @@ export function BoosterPayoutPage({
     .reduce((sum, record) => sum + Number(record.totalBalance || 0), 0);
 
   const personalAdjustments = adjustments.filter(
-    (adj) => adj.discordId === user?.id || adj.boosterName === user?.username
+    (adj) => !isAdmin || adj.discordId === user?.id || adj.boosterName === user?.username
   );
-  const personalNetAdjustments = personalAdjustments.reduce(
+  const activePersonalAdjustments = personalAdjustments.filter((adj) => !adj.settled);
+  const personalNetAdjustments = activePersonalAdjustments.reduce(
     (sum, adj) => sum + (adj.type === "add" ? Number(adj.amount || 0) : -Number(adj.amount || 0)),
     0
   );
@@ -91,7 +92,8 @@ export function BoosterPayoutPage({
     personalAdjustments.filter((adj) => adj.type === "add").reduce((sum, adj) => sum + Number(adj.amount || 0), 0);
 
   // Admin calculations
-  const allNetAdjustments = adjustments.reduce(
+  const activeAdjustments = adjustments.filter((adj) => !adj.settled);
+  const allNetAdjustments = activeAdjustments.reduce(
     (sum, adj) => sum + (adj.type === "add" ? Number(adj.amount || 0) : -Number(adj.amount || 0)),
     0
   );

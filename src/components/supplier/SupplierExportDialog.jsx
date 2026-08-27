@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label.jsx";
 export function SupplierExportDialog({
   isOpen,
   records = [],
+  withdrawals = [],
   defaultDateFrom = "",
   defaultDateTo = "",
   onClose,
@@ -19,6 +20,14 @@ export function SupplierExportDialog({
   const verifiedRecords = useMemo(
     () => records.filter((record) => record.correct && !record.paid),
     [records]
+  );
+  const activeWithdrawals = useMemo(
+    () => (withdrawals || []).filter((w) => !w.settled && Number(w.amount || 0) > 0),
+    [withdrawals]
+  );
+  const allActiveWithdrawalsTotal = useMemo(
+    () => activeWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0),
+    [activeWithdrawals]
   );
 
   const [dateFrom, setDateFrom] = useState(defaultDateFrom);
@@ -35,6 +44,7 @@ export function SupplierExportDialog({
     () => verifiedRecords.reduce((sum, r) => sum + Number(r.totalCost || 0), 0),
     [verifiedRecords]
   );
+  const allFinalPrice = allVerifiedTotal - allActiveWithdrawalsTotal;
 
   const dateRangeVerifiedRecords = useMemo(() => {
     return verifiedRecords.filter((record) => {
@@ -50,19 +60,34 @@ export function SupplierExportDialog({
     [dateRangeVerifiedRecords]
   );
 
+  const dateRangeWithdrawals = useMemo(() => {
+    return activeWithdrawals.filter((w) => {
+      const wDate = String(w.date || "").slice(0, 10);
+      if (dateFrom && wDate < dateFrom) return false;
+      if (dateTo && wDate > dateTo) return false;
+      return true;
+    });
+  }, [activeWithdrawals, dateFrom, dateTo]);
+
+  const dateRangeWithdrawalsTotal = useMemo(
+    () => dateRangeWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0),
+    [dateRangeWithdrawals]
+  );
+  const dateRangeFinalPrice = dateRangeTotal - dateRangeWithdrawalsTotal;
+
   if (!isOpen) return null;
 
   const handleInstantExport = () => {
     if (!verifiedRecords.length) return;
     const summary = buildSupplierSummary(verifiedRecords);
-    onExport(verifiedRecords, summary, allVerifiedTotal);
+    onExport(verifiedRecords, summary, allVerifiedTotal, activeWithdrawals);
     onClose();
   };
 
   const handleDateRangeExport = () => {
     if (!dateRangeVerifiedRecords.length) return;
     const summary = buildSupplierSummary(dateRangeVerifiedRecords);
-    onExport(dateRangeVerifiedRecords, summary, dateRangeTotal);
+    onExport(dateRangeVerifiedRecords, summary, dateRangeTotal, dateRangeWithdrawals);
     onClose();
   };
 
@@ -139,9 +164,23 @@ export function SupplierExportDialog({
               Immediately export all {verifiedRecords.length} verified unpaid sales records in the current batch.
             </p>
             <div className="flex items-center justify-between pt-1">
-              <span className="font-mono text-sm font-bold text-sky-300">
-                {money(allVerifiedTotal)}
-              </span>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-sm font-bold text-sky-300">
+                    {money(allFinalPrice)}
+                  </span>
+                  {allActiveWithdrawalsTotal > 0 && (
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      (Sales: {money(allVerifiedTotal)} | Pre-withdraw: -{money(allActiveWithdrawalsTotal)})
+                    </span>
+                  )}
+                </div>
+                {allActiveWithdrawalsTotal > 0 && (
+                  <span className="text-[10px] text-emerald-400 font-semibold block">
+                    Final Price after pre-withdrawals
+                  </span>
+                )}
+              </div>
               <Button
                 type="button"
                 size="sm"
@@ -234,10 +273,19 @@ export function SupplierExportDialog({
             {/* Range Result & Action */}
             <div className="flex items-center justify-between pt-2 border-t border-border/40">
               <div>
-                <span className="text-[11px] text-muted-foreground block">Selected Range Total</span>
-                <span className="font-mono text-sm font-bold text-emerald-300">
-                  {money(dateRangeTotal)}
+                <span className="text-[11px] text-muted-foreground block">
+                  {dateRangeWithdrawalsTotal > 0 ? "Final Price (After Pre-withdrawals)" : "Selected Range Total"}
                 </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-sm font-bold text-emerald-300">
+                    {money(dateRangeFinalPrice)}
+                  </span>
+                  {dateRangeWithdrawalsTotal > 0 && (
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      (Sales: {money(dateRangeTotal)} | Pre-withdraw: -{money(dateRangeWithdrawalsTotal)})
+                    </span>
+                  )}
+                </div>
               </div>
               <Button
                 type="button"

@@ -36,9 +36,24 @@ function renderPage(overrides = {}) {
     loading: false,
     loadError: "",
     records: [verifiedRecord, reviewRecord],
+    withdrawals: [
+      {
+        id: "w1",
+        date: "2026-08-20",
+        charName: "BankerOne",
+        guild: "Main Guild",
+        amount: 50,
+        note: "Initial bank gold",
+        settled: false
+      }
+    ],
     services: [
       { type: "Mythic+", price: 100, active: true },
       { type: "Raid", price: 200, active: true }
+    ],
+    guilds: [
+      { name: "Main Guild", active: true, isDefault: true },
+      { name: "Alt Guild", active: true, isDefault: false }
     ],
     armorTypes: ["Cloth", "Plate"],
     paidHistory: [],
@@ -50,9 +65,13 @@ function renderPage(overrides = {}) {
     },
     editing: null,
     formKey: 0,
+    withdrawalFormKey: 0,
     onSubmitRecord: vi.fn((event) => event.preventDefault()),
     onPatchRecord: vi.fn(),
     onDeleteRecord: vi.fn(),
+    onSubmitWithdrawal: vi.fn((event) => event.preventDefault()),
+    onPatchWithdrawal: vi.fn(),
+    onDeleteWithdrawal: vi.fn(),
     onSetEditing: vi.fn(),
     onExport: vi.fn(),
     onVerifyAll: vi.fn(),
@@ -65,10 +84,10 @@ function renderPage(overrides = {}) {
 }
 
 describe("SupplierUnpaidPage", () => {
-  it("renders summary actions including verify all, export, mark paid, and the filter bar", () => {
+  it("renders summary actions including verify all, export, mark paid, and sub-tabs", () => {
     renderPage();
 
-    const summaryPanel = screen.getByRole("heading", { name: "Verified unpaid total" }).closest("aside");
+    const summaryPanel = screen.getByRole("heading", { name: "Verified unpaid summary" }).closest("aside");
     const recordsWorkspace = screen.getByRole("region", { name: "Supplier records workspace" });
 
     expect(within(summaryPanel).getByRole("button", { name: /Verify all unpaid \(1\)/i })).toBeInTheDocument();
@@ -76,12 +95,29 @@ describe("SupplierUnpaidPage", () => {
     expect(within(summaryPanel).getByRole("button", { name: "Mark batch paid" })).toBeInTheDocument();
     expect(within(summaryPanel).getByText("2 unpaid")).toBeInTheDocument();
 
+    expect(screen.getByRole("button", { name: "Unpaid sales (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Withdraw Balance (1)" })).toBeInTheDocument();
+
     const filterBar = screen.getByRole("region", { name: "Supplier record filters" });
     expect(filterBar).toBeInTheDocument();
     expect(within(filterBar).getByPlaceholderText("Buyer, note, service...")).toBeInTheDocument();
     expect(within(filterBar).getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     expect(within(recordsWorkspace).getByRole("button", { name: "Record sale" })).toBeInTheDocument();
     expect(within(recordsWorkspace).getByRole("columnheader", { name: "Buyer" })).toBeInTheDocument();
+  });
+
+  it("switches to Withdraw Balance sub-tab and shows withdrawal form and table", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const withdrawTabBtn = screen.getByRole("button", { name: "Withdraw Balance (1)" });
+    await user.click(withdrawTabBtn);
+
+    const withdrawalsWorkspace = screen.getByRole("region", { name: "Supplier withdrawals workspace" });
+    expect(withdrawalsWorkspace).toBeInTheDocument();
+    expect(within(withdrawalsWorkspace).getByRole("button", { name: "Record withdrawal" })).toBeInTheDocument();
+    expect(within(withdrawalsWorkspace).getByText("BankerOne")).toBeInTheDocument();
+    expect(within(withdrawalsWorkspace).getAllByText("Main Guild").length).toBeGreaterThan(0);
   });
 
   it("filters sales records by search text and status", async () => {
@@ -147,7 +183,7 @@ describe("SupplierUnpaidPage", () => {
 
     const recordsWorkspace = screen.getByRole("region", { name: "Supplier records workspace" });
 
-    expect(screen.getByRole("heading", { name: "Verified unpaid total" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Verified unpaid summary" })).toBeInTheDocument();
     expect(within(recordsWorkspace).getByLabelText("Loading unpaid sales records")).toBeInTheDocument();
     expect(within(recordsWorkspace).queryByRole("button", { name: "Record sale" })).not.toBeInTheDocument();
   });

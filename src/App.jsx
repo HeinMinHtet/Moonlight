@@ -28,8 +28,10 @@ const initialState = {
   permissions: {},
   supplierServices: [],
   boosterPrices: [],
+  supplierGuilds: [],
   armorTypes: [],
   supplierRecords: [],
+  supplierWithdrawals: [],
   supplierHistory: [],
   supplierSummary: [],
   boosterRecords: [],
@@ -45,6 +47,7 @@ export function App() {
   const [loadError, setLoadError] = useState("");
   const [confirmOptions, setConfirmOptions] = useState(null);
   const [supplierFormKey, setSupplierFormKey] = useState(0);
+  const [withdrawalFormKey, setWithdrawalFormKey] = useState(0);
   const [boosterFormKey, setBoosterFormKey] = useState(0);
   const [profitRefreshVersion, setProfitRefreshVersion] = useState(0);
   const confirmResolver = useRef(null);
@@ -85,7 +88,7 @@ export function App() {
 
   const loadSupplier = useCallback(async (activePermissions = data.permissions) => {
     if (!activePermissions.supplierRecords) {
-      setData((current) => ({ ...current, supplierRecords: [], supplierHistory: [], supplierSummary: [] }));
+      setData((current) => ({ ...current, supplierRecords: [], supplierHistory: [], supplierSummary: [], supplierWithdrawals: [] }));
       return;
     }
     const payload = await api("/api/supplier-records");
@@ -93,7 +96,8 @@ export function App() {
       ...current,
       supplierRecords: payload.records || [],
       supplierHistory: payload.paidRecords || [],
-      supplierSummary: payload.summary || []
+      supplierSummary: payload.summary || [],
+      supplierWithdrawals: payload.withdrawals || []
     }));
   }, [data.permissions]);
 
@@ -132,6 +136,7 @@ export function App() {
           ...config,
           supplierServices: preserveRateDrafts ? current.supplierServices : (config.supplierServices || []),
           boosterPrices: preserveRateDrafts ? current.boosterPrices : (config.boosterPrices || []),
+          supplierGuilds: preserveRateDrafts ? current.supplierGuilds : (config.supplierGuilds || []),
           supplierRecords: supplierPayload
             ? (supplierPayload.records || [])
             : config.permissions.supplierRecords ? current.supplierRecords : [],
@@ -141,6 +146,9 @@ export function App() {
           supplierSummary: supplierPayload
             ? (supplierPayload.summary || [])
             : config.permissions.supplierRecords ? current.supplierSummary : [],
+          supplierWithdrawals: supplierPayload
+            ? (supplierPayload.withdrawals || [])
+            : config.permissions.supplierRecords ? current.supplierWithdrawals : [],
           boosterRecords: boosterPayload
             ? (boosterPayload.records || [])
             : config.permissions.boosterRecords ? current.boosterRecords : [],
@@ -168,7 +176,7 @@ export function App() {
     try {
       const config = await api("/api/config");
       const [supplierPayload, boosterPayload] = await Promise.all([
-        config.permissions.supplierRecords ? api("/api/supplier-records") : Promise.resolve({ records: [], paidRecords: [], summary: [] }),
+        config.permissions.supplierRecords ? api("/api/supplier-records") : Promise.resolve({ records: [], paidRecords: [], summary: [], withdrawals: [] }),
         config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [] })
       ]);
       setData((current) => ({
@@ -177,6 +185,7 @@ export function App() {
         supplierRecords: supplierPayload.records || [],
         supplierHistory: supplierPayload.paidRecords || [],
         supplierSummary: supplierPayload.summary || [],
+        supplierWithdrawals: supplierPayload.withdrawals || [],
         boosterRecords: boosterPayload.records || [],
         boosterSummary: boosterPayload.summary || [],
         boosterAdjustments: boosterPayload.adjustments || []
@@ -311,7 +320,8 @@ export function App() {
       ...current,
       supplierRecords: payload.records || [],
       supplierHistory: payload.paidRecords || [],
-      supplierSummary: payload.summary || []
+      supplierSummary: payload.summary || [],
+      supplierWithdrawals: payload.withdrawals || []
     }));
     showToast(`${payload.verifiedCount || rowsToVerify.length} sales records marked verified.`);
   });
@@ -334,24 +344,33 @@ export function App() {
       ...current,
       supplierRecords: payload.records || [],
       supplierHistory: payload.paidRecords || [],
-      supplierSummary: payload.summary || []
+      supplierSummary: payload.summary || [],
+      supplierWithdrawals: payload.withdrawals || []
     }));
     showToast(`${payload.paidCount || batchRows.length} supplier records moved to paid history.`);
   });
 
-  const exportSupplierPng = (batchRows = verifiedUnpaidSupplierRows, batchSummary = data.supplierSummary, batchTotal = supplierGrandTotal) => runAction(async () => {
+  const exportSupplierPng = (batchRows = verifiedUnpaidSupplierRows, batchSummary = data.supplierSummary, batchTotal = supplierGrandTotal, withdrawals = data.supplierWithdrawals) => runAction(async () => {
     if (!batchRows.length) return showToast("No verified unpaid sales to export.");
-    await exportSupplierReport(batchRows, batchSummary, batchTotal);
+    const activeWithdrawals = (withdrawals || []).filter((w) => !w.settled && Number(w.amount || 0) > 0);
+    await exportSupplierReport(batchRows, batchSummary, batchTotal, {
+      withdrawals: activeWithdrawals,
+      totalLabel: "FINAL PRICE"
+    });
     showToast("Supplier report exported.");
   });
 
   const exportPaidSupplierBatch = (batch) => runAction(async () => {
     if (!batch?.records?.length) return showToast("This paid batch has no records to export.");
     const summary = buildSupplierSummary(batch.records, { includePaid: true });
+    const batchWithdrawals = (data.supplierWithdrawals || []).filter(
+      (w) => w.settlementBatchId === batch.id && Number(w.amount || 0) > 0
+    );
     await exportSupplierReport(batch.records, summary, batch.total, {
       title: "Paid Supplier Batch",
-      totalLabel: "Paid batch total",
-      batchLabel: `Batch ${batch.id}`
+      totalLabel: "FINAL PRICE",
+      batchLabel: `Batch ${batch.id}`,
+      withdrawals: batchWithdrawals
     });
     showToast("Paid batch exported.");
   });
@@ -370,9 +389,53 @@ export function App() {
       ...current,
       supplierRecords: payload.records || [],
       supplierHistory: payload.paidRecords || [],
-      supplierSummary: payload.summary || []
+      supplierSummary: payload.summary || [],
+      supplierWithdrawals: payload.withdrawals || []
     }));
     showToast(`${payload.reopenedCount || batch.records.length} sales records returned to unpaid sales.`);
+  });
+
+  const submitSupplierWithdrawal = (event) => runAction(async () => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const body = Object.fromEntries(form.entries());
+    body.amount = Number(body.amount);
+    const payload = await request("/api/supplier-withdrawals", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+    setWithdrawalFormKey((key) => key + 1);
+    setData((current) => ({
+      ...current,
+      supplierWithdrawals: payload.withdrawals || [payload.withdrawal, ...current.supplierWithdrawals]
+    }));
+    showToast(`Pre-withdrawal of ${money(body.amount)} for ${body.charName} recorded.`);
+  });
+
+  const patchSupplierWithdrawal = (id, body, message = "Pre-withdrawal updated.") => runAction(async () => {
+    const payload = await request(`/api/supplier-withdrawals/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    setEditing(null);
+    setData((current) => ({
+      ...current,
+      supplierWithdrawals: payload.withdrawals || current.supplierWithdrawals.map((w) => (w.id === id ? payload.withdrawal : w))
+    }));
+    showToast(message);
+  });
+
+  const deleteSupplierWithdrawal = (withdrawal) => runAction(async () => {
+    const confirmed = await askConfirm({
+      title: "Delete pre-withdrawal?",
+      body: `This removes the ${money(withdrawal.amount)} withdrawal for ${withdrawal.charName}. This action cannot be undone.`,
+      confirmLabel: "Delete withdrawal",
+      dangerous: true
+    });
+    if (!confirmed) return;
+    const payload = await request(`/api/supplier-withdrawals/${withdrawal.id}`, { method: "DELETE" });
+    setData((current) => ({
+      ...current,
+      supplierWithdrawals: payload.withdrawals || current.supplierWithdrawals.filter((w) => w.id !== withdrawal.id)
+    }));
+    showToast("Pre-withdrawal deleted.");
   });
 
   const submitBoosterRecord = (event) => runAction(async () => {
@@ -507,6 +570,17 @@ export function App() {
     showToast("Booster rates saved.");
   });
 
+  const saveSupplierGuilds = (event) => runAction(async () => {
+    event.preventDefault();
+    validateGuildRows(data.supplierGuilds);
+    const payload = await request("/api/prices/supplier-guilds", {
+      method: "PUT",
+      body: JSON.stringify({ rows: data.supplierGuilds })
+    });
+    setData((current) => ({ ...current, supplierGuilds: payload.supplierGuilds || [] }));
+    showToast("Supplier guilds saved.");
+  });
+
   const updatePriceRow = (collection, index, patch) => {
     setData((current) => ({
       ...current,
@@ -572,6 +646,67 @@ export function App() {
     setData((current) => ({ ...current, [collection]: [...current[collection], { [key]: "", price: 0, active: true }] }));
   };
 
+  const addGuildRow = () => {
+    if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit guilds.");
+    setData((current) => ({
+      ...current,
+      supplierGuilds: [...(current.supplierGuilds || []), { name: "", active: true, isDefault: false }]
+    }));
+  };
+
+  const updateGuildRow = (index, patch) => {
+    setData((current) => ({
+      ...current,
+      supplierGuilds: (current.supplierGuilds || []).map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row))
+    }));
+  };
+
+  const toggleGuildRowStatus = (index) => runAction(async () => {
+    const row = (data.supplierGuilds || [])[index];
+    if (!row) return;
+    const historyCount = (data.supplierWithdrawals || []).filter((w) => w.guild === row.name).length;
+    const archiving = row.active !== false;
+    if (archiving && historyCount > 0) {
+      const confirmed = await askConfirm({
+        title: `Archive ${row.name}?`,
+        body: `${historyCount} withdrawal record${historyCount === 1 ? " uses" : "s use"} this guild. Archiving hides it from new withdrawals but keeps existing withdrawals unchanged.`,
+        confirmLabel: "Archive guild"
+      });
+      if (!confirmed) return;
+    }
+    setData((current) => ({
+      ...current,
+      supplierGuilds: current.supplierGuilds.map((item, rowIndex) => (
+        rowIndex === index ? { ...item, active: !archiving } : item
+      ))
+    }));
+    showToast(archiving ? "Guild marked for archive. Save changes to apply." : "Guild restored. Save changes to apply.");
+  });
+
+  const deleteGuildRow = (index) => {
+    setData((current) => ({
+      ...current,
+      supplierGuilds: (current.supplierGuilds || []).filter((_, rowIndex) => rowIndex !== index)
+    }));
+    showToast("Guild removed. Save changes to apply.");
+  };
+
+  const setDefaultGuildRow = (index) => {
+    setData((current) => {
+      const currentRows = current.supplierGuilds || [];
+      const targetRow = currentRows[index];
+      if (!targetRow) return current;
+      const willBeDefault = !targetRow.isDefault;
+      return {
+        ...current,
+        supplierGuilds: currentRows.map((row, rowIndex) => ({
+          ...row,
+          isDefault: rowIndex === index ? willBeDefault : false
+        }))
+      };
+    });
+  };
+
   return (
     <main className="shell">
       <a className="skip-link" href="#ledger-content">Skip to ledger content</a>
@@ -610,35 +745,41 @@ export function App() {
 
         {activeTab === "supplier" && (
           <SupplierUnpaidPage
-          isAdmin={isAdmin}
-          loading={loading}
-          loadError={loadError}
-          records={data.supplierRecords}
-          services={data.supplierServices}
-          armorTypes={data.armorTypes}
-          paidHistory={data.supplierHistory}
-          permissions={permissions}
-          editing={editing}
-          formKey={supplierFormKey}
-          onSubmitRecord={submitSupplierRecord}
-          onPatchRecord={patchSupplierRecord}
-          onDeleteRecord={deleteSupplierRecord}
-          onSetEditing={setEditing}
-          onExport={exportSupplierPng}
-          onVerifyAll={verifyAllSupplierSales}
-          onMarkPaid={markSupplierPaid}
+            isAdmin={isAdmin}
+            loading={loading}
+            loadError={loadError}
+            records={data.supplierRecords}
+            withdrawals={data.supplierWithdrawals}
+            services={data.supplierServices}
+            guilds={data.supplierGuilds}
+            armorTypes={data.armorTypes}
+            paidHistory={data.supplierHistory}
+            permissions={permissions}
+            editing={editing}
+            formKey={supplierFormKey}
+            withdrawalFormKey={withdrawalFormKey}
+            onSubmitRecord={submitSupplierRecord}
+            onPatchRecord={patchSupplierRecord}
+            onDeleteRecord={deleteSupplierRecord}
+            onSubmitWithdrawal={submitSupplierWithdrawal}
+            onPatchWithdrawal={patchSupplierWithdrawal}
+            onDeleteWithdrawal={deleteSupplierWithdrawal}
+            onSetEditing={setEditing}
+            onExport={exportSupplierPng}
+            onVerifyAll={verifyAllSupplierSales}
+            onMarkPaid={markSupplierPaid}
           />
         )}
 
         {activeTab === "supplierHistory" && (
           <SupplierPaidHistoryPage
-          isAdmin={isAdmin}
-          loading={loading}
-          loadError={loadError}
-          records={data.supplierHistory}
-          canReopen={permissions.canReopenSupplierPaid}
-          onExportBatch={exportPaidSupplierBatch}
-          onReopenBatch={reopenSupplierPaymentBatch}
+            isAdmin={isAdmin}
+            loading={loading}
+            loadError={loadError}
+            records={data.supplierHistory}
+            canReopen={permissions.canReopenSupplierPaid}
+            onExportBatch={exportPaidSupplierBatch}
+            onReopenBatch={reopenSupplierPaymentBatch}
           />
         )}
 
@@ -679,8 +820,10 @@ export function App() {
             canEditPrices={permissions.canEditPrices}
             supplierServices={data.supplierServices}
             boosterPrices={data.boosterPrices}
+            supplierGuilds={data.supplierGuilds}
             supplierRecords={[...data.supplierRecords, ...data.supplierHistory]}
             boosterRecords={data.boosterRecords}
+            supplierWithdrawals={data.supplierWithdrawals}
             onAddPriceRow={addPriceRow}
             onTogglePriceRow={togglePriceRowStatus}
             onDeletePriceRow={deletePriceRow}
@@ -688,6 +831,12 @@ export function App() {
             onUpdatePriceRow={updatePriceRow}
             onSaveSupplierPrices={saveSupplierPrices}
             onSaveBoosterPrices={saveBoosterPrices}
+            onAddGuildRow={addGuildRow}
+            onToggleGuildRow={toggleGuildRowStatus}
+            onDeleteGuildRow={deleteGuildRow}
+            onSetDefaultGuildRow={setDefaultGuildRow}
+            onUpdateGuildRow={updateGuildRow}
+            onSaveSupplierGuilds={saveSupplierGuilds}
           />
         )}
       </div>
@@ -696,6 +845,13 @@ export function App() {
       <Toaster />
     </main>
   );
+}
+
+function validateGuildRows(rows) {
+  const names = rows.map((row) => String(row.name || "").trim()).filter(Boolean);
+  if (names.length !== rows.length) throw new Error("Every guild needs a name.");
+  const normalizedNames = names.map((name) => name.toLocaleLowerCase());
+  if (new Set(normalizedNames).size !== normalizedNames.length) throw new Error("Duplicate guild names are not allowed.");
 }
 
 function validateRateRows(rows, key, label) {

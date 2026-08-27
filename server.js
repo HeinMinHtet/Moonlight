@@ -11,6 +11,13 @@ import {
   getSupplierServicesList,
   getBoosterPricesList,
   getArmorTypesList,
+  getSupplierGuildsList,
+  updateSupplierGuilds,
+  getSupplierWithdrawalsPayload,
+  insertSupplierWithdrawal,
+  getSupplierWithdrawalById,
+  updateSupplierWithdrawal,
+  deleteSupplierWithdrawal,
   getSupplierRecordsPayload,
   insertSupplierRecord,
   updateSupplierRecord,
@@ -375,8 +382,8 @@ async function handleApi(req, res, url) {
     const result = await verifyAllSupplierRecords(selectedIds);
     if (result.error) return sendJson(res, 400, { error: result.error });
 
-    const { records, paidRecords, summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { verifiedCount: result.verifiedCount, records, paidRecords, summary });
+    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { verifiedCount: result.verifiedCount, records, paidRecords, summary, withdrawals });
   }
 
   if (pathname === "/api/supplier-records/mark-paid" && req.method === "POST") {
@@ -390,8 +397,8 @@ async function handleApi(req, res, url) {
     const result = await markSupplierRecordsPaid(selectedIds, session);
     if (result.error) return sendJson(res, 400, { error: result.error });
 
-    const { records, paidRecords, summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { paidCount: result.paidCount, paymentBatchId: result.paymentBatchId, records, paidRecords, summary });
+    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { paidCount: result.paidCount, paymentBatchId: result.paymentBatchId, records, paidRecords, summary, withdrawals });
   }
 
   if (pathname.startsWith("/api/supplier-payment-batches/") && pathname.endsWith("/reopen") && req.method === "POST") {
@@ -403,8 +410,97 @@ async function handleApi(req, res, url) {
     const result = await reopenSupplierPaymentBatch(paymentBatchId, session);
     if (result.error) return sendJson(res, 404, { error: result.error });
 
-    const { records, paidRecords, summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { reopenedCount: result.reopenedCount, records, paidRecords, summary });
+    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { reopenedCount: result.reopenedCount, records, paidRecords, summary, withdrawals });
+  }
+
+  if (pathname === "/api/supplier-withdrawals" && req.method === "GET") {
+    if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can view supplier withdrawals.");
+    const payload = await getSupplierWithdrawalsPayload();
+    return sendJson(res, 200, payload);
+  }
+
+  if (pathname === "/api/supplier-withdrawals" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can create supplier pre-withdrawals.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const charName = String(body.charName || "").trim();
+    const guild = String(body.guild || "").trim();
+    const amount = Number(body.amount);
+    const note = String(body.note || "").trim();
+    const date = String(body.date || new Date().toISOString().slice(0, 10)).trim();
+
+    if (!charName) return sendJson(res, 400, { error: "Character name is required." });
+    if (!guild) return sendJson(res, 400, { error: "Guild is required." });
+    if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Withdrawal amount must be greater than 0." });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
+
+    const withdrawal = {
+      id: `sw_${randomBytes(10).toString("base64url")}`,
+      date,
+      charName,
+      guild,
+      amount,
+      note,
+      settled: false,
+      settledAt: null,
+      settlementBatchId: null,
+      createdByDiscordId: session.discordId,
+      createdByName: session.username,
+      createdAt: new Date().toISOString()
+    };
+
+    await insertSupplierWithdrawal(withdrawal);
+    const { withdrawals } = await getSupplierWithdrawalsPayload();
+    return sendJson(res, 201, { withdrawal, withdrawals });
+  }
+
+  if (pathname.startsWith("/api/supplier-withdrawals/") && req.method === "PATCH") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can edit supplier pre-withdrawals.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const body = await readJson(req);
+    const existing = await getSupplierWithdrawalById(id);
+    if (!existing) return sendJson(res, 404, { error: "Withdrawal record not found." });
+
+    const updates = {};
+    if ("charName" in body) {
+      const charName = String(body.charName || "").trim();
+      if (!charName) return sendJson(res, 400, { error: "Character name is required." });
+      updates.charName = charName;
+    }
+    if ("guild" in body) {
+      const guild = String(body.guild || "").trim();
+      if (!guild) return sendJson(res, 400, { error: "Guild is required." });
+      updates.guild = guild;
+    }
+    if ("amount" in body) {
+      const amount = Number(body.amount);
+      if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Withdrawal amount must be greater than 0." });
+      updates.amount = amount;
+    }
+    if ("date" in body) {
+      const date = String(body.date || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
+      updates.date = date;
+    }
+    if ("note" in body) updates.note = String(body.note || "").trim();
+
+    const updated = await updateSupplierWithdrawal(id, updates);
+    const { withdrawals } = await getSupplierWithdrawalsPayload();
+    return sendJson(res, 200, { withdrawal: updated, withdrawals });
+  }
+
+  if (pathname.startsWith("/api/supplier-withdrawals/") && req.method === "DELETE") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete supplier pre-withdrawals.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getSupplierWithdrawalById(id);
+    if (!existing) return sendJson(res, 404, { error: "Withdrawal record not found." });
+
+    await deleteSupplierWithdrawal(id);
+    const { withdrawals } = await getSupplierWithdrawalsPayload();
+    return sendJson(res, 200, { deletedId: id, withdrawals });
   }
 
   if (pathname.startsWith("/api/supplier-records/") && req.method === "PATCH") {
@@ -731,7 +827,39 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { boosterPrices });
   }
 
+  if (pathname === "/api/prices/supplier-guilds" && req.method === "PUT") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change supplier guilds.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const cleaned = cleanGuildRows(body.rows);
+    const supplierGuilds = await updateSupplierGuilds(cleaned);
+    return sendJson(res, 200, { supplierGuilds });
+  }
+
   sendJson(res, 404, { error: "Not found." });
+}
+
+function cleanGuildRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw Object.assign(new Error("Keep at least one guild. Archive guilds that should no longer be used."), { statusCode: 400 });
+  }
+  const cleaned = rows.map((row) => ({
+    name: String(row.name || "").trim(),
+    active: row.active !== false,
+    isDefault: Boolean(row.isDefault)
+  }));
+  if (cleaned.some((row) => !row.name)) {
+    throw Object.assign(new Error("Every guild needs a name."), { statusCode: 400 });
+  }
+  const seen = new Set();
+  for (const row of cleaned) {
+    const normalizedName = row.name.toLocaleLowerCase();
+    if (seen.has(normalizedName)) {
+      throw Object.assign(new Error("Duplicate guild names are not allowed."), { statusCode: 400 });
+    }
+    seen.add(normalizedName);
+  }
+  return cleaned;
 }
 
 function cleanPriceRows(rows, key) {

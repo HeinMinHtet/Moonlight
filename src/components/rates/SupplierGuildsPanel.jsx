@@ -1,146 +1,16 @@
 import React, { useMemo, useState } from "react";
 import { Plus, Star, Trash2 } from "lucide-react";
-import { AccessDenied } from "../AccessDenied.jsx";
-import { SupplierGuildsPanel } from "./SupplierGuildsPanel.jsx";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
-import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
-import { Skeleton } from "@/components/ui/skeleton.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
 import { cn } from "@/lib/utils.js";
 
-export function RateSettingsPage({
-  isAdmin,
-  loading,
-  loadError,
-  canEditPrices,
-  supplierServices,
-  boosterPrices,
-  supplierGuilds = [],
-  supplierRecords,
-  boosterRecords,
-  supplierWithdrawals = [],
-  onAddPriceRow,
-  onTogglePriceRow,
-  onDeletePriceRow,
-  onSetDefaultPriceRow,
-  onUpdatePriceRow,
-  onSaveSupplierPrices,
-  onSaveBoosterPrices,
-  onAddGuildRow,
-  onToggleGuildRow,
-  onDeleteGuildRow,
-  onSetDefaultGuildRow,
-  onUpdateGuildRow,
-  onSaveSupplierGuilds
-}) {
-  if (!isAdmin) return <AccessDenied />;
-  if (loading) {
-    return (
-      <section className="tab-panel active space-y-3">
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Skeleton className="h-96 w-full rounded-xl" />
-          <Skeleton className="h-96 w-full rounded-xl" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Skeleton className="h-96 w-full rounded-xl" />
-        </div>
-      </section>
-    );
-  }
-  if (loadError) {
-    return (
-      <section className="tab-panel active">
-        <Alert variant="destructive">
-          <AlertTitle>Could not load default rates</AlertTitle>
-          <AlertDescription>{loadError}</AlertDescription>
-        </Alert>
-      </section>
-    );
-  }
-
-  return (
-    <section className="tab-panel active rate-settings-page space-y-4">
-      <header className="rate-page-head">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">Default rates & guilds</h2>
-            <Badge variant="admin">Admin controls</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Changes affect new records and pre-withdrawals only. Existing supplier sales, booster payouts, and withdrawals keep their saved values.
-          </p>
-        </div>
-      </header>
-
-      {/* Top row: 2 rates tables side-by-side on desktop */}
-      <section className="price-grid grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Default rate tables">
-        <PricePanel
-          title="Supplier sale rates"
-          itemLabel="service"
-          rows={supplierServices}
-          historyRecords={supplierRecords}
-          itemKey="type"
-          historyKey="serviceType"
-          addLabel="Add service"
-          saveLabel="Save supplier defaults"
-          disabled={!canEditPrices}
-          onAdd={() => onAddPriceRow("supplierServices", "type")}
-          onToggle={(index) => onTogglePriceRow("supplierServices", index)}
-          onDelete={(index) => onDeletePriceRow?.("supplierServices", index)}
-          onSetDefault={(index) => onSetDefaultPriceRow?.("supplierServices", index)}
-          onChange={(index, change) => onUpdatePriceRow("supplierServices", index, change)}
-          onSubmit={onSaveSupplierPrices}
-        />
-        <PricePanel
-          title="Booster payout rates"
-          itemLabel="key level"
-          rows={boosterPrices}
-          historyRecords={boosterRecords}
-          itemKey="level"
-          historyKey="level"
-          addLabel="Add key level"
-          saveLabel="Save booster defaults"
-          disabled={!canEditPrices}
-          onAdd={() => onAddPriceRow("boosterPrices", "level")}
-          onToggle={(index) => onTogglePriceRow("boosterPrices", index)}
-          onDelete={(index) => onDeletePriceRow?.("boosterPrices", index)}
-          onSetDefault={(index) => onSetDefaultPriceRow?.("boosterPrices", index)}
-          onChange={(index, change) => onUpdatePriceRow("boosterPrices", index, change)}
-          onSubmit={onSaveBoosterPrices}
-        />
-      </section>
-
-      {/* Bottom row: Supplier guild names panel under the 2 tables */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Supplier guild management">
-        <SupplierGuildsPanel
-          rows={supplierGuilds}
-          withdrawals={supplierWithdrawals}
-          disabled={!canEditPrices}
-          onAdd={onAddGuildRow}
-          onToggle={onToggleGuildRow}
-          onDelete={onDeleteGuildRow}
-          onSetDefault={onSetDefaultGuildRow}
-          onChange={onUpdateGuildRow}
-          onSubmit={onSaveSupplierGuilds}
-        />
-      </section>
-    </section>
-  );
-}
-
-function PricePanel({
-  title,
-  itemLabel,
-  rows,
-  historyRecords,
-  itemKey,
-  historyKey,
-  addLabel,
-  saveLabel,
-  disabled,
+export function SupplierGuildsPanel({
+  title = "Supplier guild names",
+  rows = [],
+  withdrawals = [],
+  disabled = false,
   onAdd,
   onToggle,
   onDelete,
@@ -149,7 +19,7 @@ function PricePanel({
   onSubmit
 }) {
   const [activeTab, setActiveTab] = useState("active");
-  const duplicateNames = useMemo(() => findDuplicateNames(rows, itemKey), [rows, itemKey]);
+  const duplicateNames = useMemo(() => findDuplicateGuildNames(rows), [rows]);
   const indexedRows = rows.map((row, index) => ({ row, index }));
   const activeRows = indexedRows.filter(({ row }) => row.active !== false);
   const archivedRows = indexedRows.filter(({ row }) => row.active === false);
@@ -162,7 +32,7 @@ function PricePanel({
         <div className="section-head flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4">
           <div>
             <h2 className="text-base font-bold text-foreground">{title}</h2>
-            <p className="panel-note text-xs text-muted-foreground">Used only when a new record is created.</p>
+            <p className="panel-note text-xs text-muted-foreground">Guilds available when recording supplier pre-withdrawals.</p>
           </div>
           <div className="section-actions flex items-center gap-2">
             <Button
@@ -171,13 +41,13 @@ function PricePanel({
               type="button"
               className="border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary font-semibold shadow-xs"
               onClick={() => {
-                onAdd();
+                onAdd?.();
                 setActiveTab("active");
               }}
               disabled={disabled}
             >
               <Plus className="size-3.5 mr-1" aria-hidden="true" />
-              {addLabel}
+              Add guild
             </Button>
             <Button
               type="submit"
@@ -185,7 +55,7 @@ function PricePanel({
               className="font-bold shadow-md"
               disabled={disabled || duplicateNames.size > 0}
             >
-              {saveLabel}
+              Save supplier guilds
             </Button>
           </div>
         </div>
@@ -221,22 +91,21 @@ function PricePanel({
 
           {duplicateNames.size > 0 && (
             <span className="text-xs font-semibold text-rose-400" role="alert">
-              Duplicate {itemLabel} names found
+              Duplicate guild names found
             </span>
           )}
         </div>
 
         {/* Compact Table */}
         <div className="rate-table-wrapper w-full overflow-x-auto">
-          <div className="min-w-[500px]">
+          <div className="min-w-[440px]">
             {/* Table Header */}
             <div
               className="rate-table-header grid items-center gap-2 border-b border-border/80 bg-muted/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"
-              style={{ gridTemplateColumns: "36px minmax(130px, 1fr) 110px 85px 130px" }}
+              style={{ gridTemplateColumns: "36px minmax(160px, 1fr) 95px 130px" }}
             >
-              <span className="text-center" title="Default selection for new records">Def</span>
-              <span>{itemLabel === "service" ? "Service" : "Mythic+ Key Level"}</span>
-              <span className="text-right">Default Rate</span>
+              <span className="text-center" title="Default selection for new withdrawals">Def</span>
+              <span>Guild Name</span>
               <span className="text-center">History</span>
               <span className="text-right pr-1">Actions</span>
             </div>
@@ -246,29 +115,29 @@ function PricePanel({
               {displayedRows.length === 0 ? (
                 <div className="py-10 text-center text-xs text-muted-foreground">
                   {activeTab === "active"
-                    ? `No active ${itemLabel} rates. Restore an archived rate or add a new one.`
-                    : `No archived ${itemLabel} rates.`}
+                    ? "No active guilds. Restore an archived guild or add a new one."
+                    : "No archived guilds."}
                 </div>
               ) : (
                 displayedRows.map(({ row, index }) => {
-                  const normalizedName = String(row[itemKey] || "").trim().toLocaleLowerCase();
+                  const normalizedName = String(row.name || "").trim().toLocaleLowerCase();
                   const duplicate = duplicateNames.has(normalizedName);
-                  const historyCount = historyRecords.filter((record) =>
-                    String(record[historyKey] || "").trim().toLocaleLowerCase() === normalizedName
+                  const historyCount = withdrawals.filter((w) =>
+                    String(w.guild || "").trim().toLocaleLowerCase() === normalizedName
                   ).length;
                   const isDefault = Boolean(row.isDefault);
                   const isArchived = activeTab === "archived";
 
                   return (
                     <div
-                      key={`${itemKey}-${index}`}
+                      key={`guild-${index}`}
                       className={cn(
                         "rate-table-row grid items-center gap-2 px-3 py-1.5 transition-colors hover:bg-muted/20",
                         isArchived && "opacity-75 bg-muted/10",
                         duplicate && "bg-rose-950/20 border-l-2 border-rose-500",
                         isDefault && "bg-amber-500/[0.06] border-l-2 border-amber-400"
                       )}
-                      style={{ gridTemplateColumns: "36px minmax(130px, 1fr) 110px 85px 130px" }}
+                      style={{ gridTemplateColumns: "36px minmax(160px, 1fr) 95px 130px" }}
                     >
                       {/* Col 1: Star */}
                       <div className="flex justify-center">
@@ -279,8 +148,8 @@ function PricePanel({
                           className="size-7 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-400/10"
                           onClick={() => onSetDefault?.(index)}
                           disabled={disabled || isArchived}
-                          title={isDefault ? "Default selection for new records" : "Set as default selection for new records"}
-                          aria-label={isDefault ? `Unmark ${row[itemKey] || itemLabel} as default` : `Set ${row[itemKey] || itemLabel} as default`}
+                          title={isDefault ? "Default selection for new withdrawals" : "Set as default guild for new withdrawals"}
+                          aria-label={isDefault ? `Unmark ${row.name || "guild"} as default` : `Set ${row.name || "guild"} as default`}
                         >
                           <Star
                             className={cn(
@@ -292,14 +161,14 @@ function PricePanel({
                         </Button>
                       </div>
 
-                      {/* Col 2: Service/Level Name Input */}
+                      {/* Col 2: Guild Name Input */}
                       <div className="min-w-0">
                         <Input
-                          value={row[itemKey] || ""}
-                          onChange={(e) => onChange(index, { [itemKey]: e.target.value })}
+                          value={row.name || ""}
+                          onChange={(e) => onChange?.(index, { name: e.target.value })}
                           disabled={disabled}
-                          placeholder={itemLabel === "service" ? "Service name" : "Key level"}
-                          aria-label={itemLabel === "service" ? "Service name" : "Key level"}
+                          placeholder="Guild name"
+                          aria-label="Guild name"
                           aria-invalid={duplicate}
                           className={cn(
                             "h-8 min-h-0 text-xs sm:text-sm px-2.5 bg-popover/80 rounded-lg",
@@ -308,38 +177,24 @@ function PricePanel({
                         />
                       </div>
 
-                      {/* Col 3: Price Input */}
-                      <div>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={row.price ?? 0}
-                          onChange={(e) => onChange(index, { price: Number(e.target.value) })}
-                          disabled={disabled}
-                          aria-label="Default rate"
-                          className="h-8 min-h-0 text-xs sm:text-sm px-2.5 text-right font-mono bg-popover/80 rounded-lg"
-                        />
-                      </div>
-
-                      {/* Col 4: Usage History Badge */}
+                      {/* Col 3: Usage History Badge */}
                       <div className="flex justify-center">
                         {historyCount > 0 ? (
                           <Badge
                             variant="warning"
                             className="text-[10px] px-1.5 py-0.5 font-semibold cursor-help whitespace-nowrap"
-                            title={`Used by ${historyCount} historical record${historyCount === 1 ? "" : "s"}. Existing saved records will keep their rates.`}
+                            title={`Used by ${historyCount} historical withdrawal record${historyCount === 1 ? "" : "s"}.`}
                           >
                             {historyCount} used
                           </Badge>
                         ) : (
-                          <Badge variant="neutral" className="text-[10px] px-1.5 py-0.5 opacity-60 whitespace-nowrap" title="Not used by any historical records.">
+                          <Badge variant="neutral" className="text-[10px] px-1.5 py-0.5 opacity-60 whitespace-nowrap" title="Not used by any withdrawals.">
                             0 used
                           </Badge>
                         )}
                       </div>
 
-                      {/* Col 5: Actions */}
+                      {/* Col 4: Actions */}
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="outline"
@@ -351,9 +206,9 @@ function PricePanel({
                               ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
                               : "text-slate-300 hover:text-white hover:bg-secondary"
                           )}
-                          onClick={() => onToggle(index)}
+                          onClick={() => onToggle?.(index)}
                           disabled={disabled}
-                          title={isArchived ? "Restore rate" : "Archive rate"}
+                          title={isArchived ? "Restore guild" : "Archive guild"}
                         >
                           {isArchived ? "Restore" : "Archive"}
                         </Button>
@@ -365,8 +220,8 @@ function PricePanel({
                             className="h-7 px-2 text-xs rounded-md font-medium border-rose-500/40 text-rose-300 bg-rose-500/5 hover:bg-rose-500/20 hover:text-rose-200"
                             onClick={() => onDelete?.(index)}
                             disabled={disabled}
-                            title={`Delete ${row[itemKey] || itemLabel}`}
-                            aria-label={`Delete ${row[itemKey] || itemLabel}`}
+                            title={`Delete ${row.name || "guild"}`}
+                            aria-label={`Delete ${row.name || "guild"}`}
                           >
                             <Trash2 className="size-3.5" aria-hidden="true" />
                           </Button>
@@ -391,10 +246,10 @@ function PricePanel({
   );
 }
 
-function findDuplicateNames(rows, key) {
+function findDuplicateGuildNames(rows) {
   const counts = new Map();
   for (const row of rows) {
-    const name = String(row[key] || "").trim().toLocaleLowerCase();
+    const name = String(row.name || "").trim().toLocaleLowerCase();
     if (name) counts.set(name, (counts.get(name) || 0) + 1);
   }
   return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name));

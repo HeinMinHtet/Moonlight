@@ -39,21 +39,23 @@ export function supplierReportFilename(records) {
   return `Sale-${startDate}-${lastDate}.png`;
 }
 
-export async function exportSupplierReport(records, summary, grandTotal, options = {}) {
+export function buildSupplierReportSvg(records, summary, grandTotal, options = {}) {
   const verifiedRecords = records.filter((record) => record.correct);
   if (!verifiedRecords.length) throw new Error("No verified sales are available to export.");
+
+  const rawWithdrawals = Array.isArray(options.withdrawals) ? options.withdrawals : [];
+  const withdrawals = rawWithdrawals.filter((w) => Number(w.amount || 0) > 0);
+  const prewithdrawTotal = withdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+  const hasWithdrawals = withdrawals.length > 0 && prewithdrawTotal > 0;
+  const finalPrice = grandTotal - prewithdrawTotal;
 
   const width = 1600;
   const rowHeight = 36;
   const tableTop = 100;
   const recordRowsTop = tableTop + 38;
-  const summaryStart = recordRowsTop + verifiedRecords.length * rowHeight + 36;
-  const summaryRowsTop = summaryStart + 66;
-  const summaryCount = Math.max(summary.length, 1);
-  const height = summaryRowsTop + summaryCount * rowHeight + 44;
-
   const recordColumns = [52, 106, 224, 450, 690, 840, 890, 1110, 1150];
   const summaryColumns = [52, 470, 670, 890];
+  const withdrawalColumns = [52, 106, 260, 520, 780, 820];
 
   const dates = verifiedRecords.map((record) => normalizedSaleDate(record.date)).filter(Boolean).sort();
   const startDate = dates[0] || today();
@@ -79,6 +81,54 @@ export async function exportSupplierReport(records, summary, grandTotal, options
     `;
   }).join("");
 
+  let currentY = recordRowsTop + verifiedRecords.length * rowHeight;
+  let withdrawalSectionHtml = "";
+
+  if (hasWithdrawals) {
+    const withdrawalStart = currentY + 36;
+    const withdrawalHeaderTop = withdrawalStart + 32;
+    const withdrawalRowsTop = withdrawalStart + 66;
+
+    const wRows = withdrawals.map((w, index) => {
+      const y = withdrawalRowsTop + index * rowHeight;
+      const fill = index % 2 ? "#141120" : "#181426";
+      return `
+        <rect x="32" y="${y}" width="1536" height="${rowHeight}" fill="${fill}" />
+        <line x1="32" y1="${y + rowHeight}" x2="1568" y2="${y + rowHeight}" stroke="#2a1f38" stroke-width="0.75" />
+        ${svgText(index + 1, withdrawalColumns[0], y + 23, { size: 13, weight: 600, color: "#64748b" })}
+        ${svgText(dateOnly(w.date), withdrawalColumns[1], y + 23, { size: 13, color: "#94a3b8" })}
+        ${svgText(truncateText(w.charName, 26), withdrawalColumns[2], y + 23, { size: 14, weight: 700, color: "#f8fafc" })}
+        ${svgText(truncateText(w.guild, 26), withdrawalColumns[3], y + 23, { size: 14, color: "#cbd5e1" })}
+        ${svgText(`-${money(w.amount)}`, withdrawalColumns[4], y + 23, { size: 14, weight: 800, color: "#f59e0b", anchor: "end", mono: true })}
+        ${svgText(truncateText(w.note || "-", 60), withdrawalColumns[5], y + 23, { size: 13, color: "#94a3b8" })}
+      `;
+    }).join("");
+
+    withdrawalSectionHtml = `
+      <!-- Pre-withdraw Balance Section Header -->
+      ${svgText("Pre-withdraw Balance / Advances", 48, withdrawalStart + 20, { size: 16, weight: 800, color: "#f59e0b" })}
+      ${svgText(`•  ${withdrawals.length} record${withdrawals.length === 1 ? "" : "s"}  •  Total Offset: -${money(prewithdrawTotal)}`, 360, withdrawalStart + 20, { size: 13, weight: 600, color: "#94a3b8" })}
+
+      <!-- Pre-withdraw Table Header -->
+      <rect x="32" y="${withdrawalHeaderTop}" width="1536" height="34" rx="6" fill="#241a30" />
+      ${svgText("#", withdrawalColumns[0], withdrawalHeaderTop + 23, { size: 12, weight: 800, color: "#c084fc" })}
+      ${svgText("DATE", withdrawalColumns[1], withdrawalHeaderTop + 23, { size: 12, weight: 800, color: "#c084fc" })}
+      ${svgText("CHARACTER", withdrawalColumns[2], withdrawalHeaderTop + 23, { size: 12, weight: 800, color: "#c084fc" })}
+      ${svgText("GUILD", withdrawalColumns[3], withdrawalHeaderTop + 23, { size: 12, weight: 800, color: "#c084fc" })}
+      ${svgText("AMOUNT", withdrawalColumns[4], withdrawalHeaderTop + 23, { size: 12, weight: 800, color: "#c084fc", anchor: "end" })}
+      ${svgText("NOTE", withdrawalColumns[5], withdrawalHeaderTop + 23, { size: 12, weight: 800, color: "#c084fc" })}
+
+      <!-- Pre-withdraw Rows -->
+      ${wRows}
+    `;
+
+    currentY = withdrawalRowsTop + withdrawals.length * rowHeight;
+  }
+
+  const summaryStart = currentY + 36;
+  const summaryRowsTop = summaryStart + 66;
+  const summaryCount = Math.max(summary.length, 1);
+
   const summaryRows = summary.map((row, index) => {
     const y = summaryRowsTop + index * rowHeight;
     const fill = index % 2 ? "#0e1726" : "#121d30";
@@ -92,10 +142,42 @@ export async function exportSupplierReport(records, summary, grandTotal, options
     `;
   }).join("");
 
-  const netTotalCardHeight = Math.max(98, summaryCount * rowHeight + 32);
-
-  const totalLabel = options.totalLabel || "NET TOTAL";
+  const totalLabel = options.totalLabel || "FINAL PRICE";
   const summaryTitle = options.summaryTitle || "Sale Summary";
+
+  let netTotalCardContent = "";
+  let netTotalCardHeight = 0;
+
+  if (hasWithdrawals) {
+    netTotalCardHeight = Math.max(154, summaryCount * rowHeight + 34);
+    netTotalCardContent = `
+      <!-- Sales Total Line -->
+      ${svgText("SALES TOTAL", 996, summaryStart + 60, { size: 12, weight: 700, color: "#94a3b8" })}
+      ${svgText(money(grandTotal), 1540, summaryStart + 60, { size: 16, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
+
+      <!-- Pre-withdraw Line -->
+      ${svgText("PRE-WITHDRAW DEDUCTED", 996, summaryStart + 86, { size: 12, weight: 700, color: "#f59e0b" })}
+      ${svgText(`-${money(prewithdrawTotal)}`, 1540, summaryStart + 86, { size: 16, weight: 800, color: "#f59e0b", anchor: "end", mono: true })}
+
+      <!-- Divider -->
+      <line x1="996" y1="${summaryStart + 100}" x2="1540" y2="${summaryStart + 100}" stroke="#334155" stroke-width="1" stroke-dasharray="4" />
+
+      <!-- Final Price Line -->
+      ${svgText(totalLabel.toUpperCase(), 996, summaryStart + 126, { size: 13, weight: 800, color: "#94a3b8" })}
+      ${svgText(`${dateRange}  •  ${verifiedRecords.length} records`, 996, summaryStart + 146, { size: 11, weight: 600, color: "#64748b" })}
+      ${svgText(money(finalPrice), 1540, summaryStart + 140, { size: 36, weight: 900, color: finalPrice >= 0 ? "#38bdf8" : "#fb7185", anchor: "end", mono: true })}
+    `;
+  } else {
+    netTotalCardHeight = Math.max(98, summaryCount * rowHeight + 32);
+    netTotalCardContent = `
+      ${svgText(totalLabel.toUpperCase(), 996, summaryStart + 66, { size: 12, weight: 800, color: "#94a3b8" })}
+      ${svgText(`${dateRange}  •  ${verifiedRecords.length} records`, 996, summaryStart + 90, { size: 12, weight: 600, color: "#64748b" })}
+      ${svgText(money(finalPrice), 1540, summaryStart + 86, { size: 38, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
+    `;
+  }
+
+  const bottomHeight = Math.max(summaryCount * rowHeight + 66, netTotalCardHeight + 32);
+  const height = summaryStart + bottomHeight + 24;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -135,6 +217,9 @@ export async function exportSupplierReport(records, summary, grandTotal, options
       <!-- Main Records Rows -->
       ${recordRows}
 
+      <!-- Pre-withdraw Section (if active withdrawals exist) -->
+      ${withdrawalSectionHtml}
+
       <!-- Bottom Summary Header -->
       ${svgText(summaryTitle, 48, summaryStart + 20, { size: 16, weight: 800, color: "#f1f5f9" })}
       <rect x="32" y="${summaryStart + 32}" width="910" height="34" rx="6" fill="#182744" />
@@ -146,13 +231,27 @@ export async function exportSupplierReport(records, summary, grandTotal, options
       <!-- Bottom Summary Rows -->
       ${summaryRows}
 
-      <!-- Net Total Card -->
+      <!-- Net Total / Final Price Card -->
       <rect x="968" y="${summaryStart + 32}" width="600" height="${netTotalCardHeight}" rx="8" fill="url(#totalCardGrad)" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.35" />
-      ${svgText(totalLabel.toUpperCase(), 996, summaryStart + 66, { size: 12, weight: 800, color: "#94a3b8" })}
-      ${svgText(`${dateRange}  •  ${verifiedRecords.length} records`, 996, summaryStart + 90, { size: 12, weight: 600, color: "#64748b" })}
-      ${svgText(money(grandTotal), 1540, summaryStart + 86, { size: 38, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
+      ${netTotalCardContent}
     </svg>
   `;
+
+  return {
+    svg,
+    width,
+    height,
+    finalPrice,
+    prewithdrawTotal,
+    hasWithdrawals
+  };
+}
+
+export async function exportSupplierReport(records, summary, grandTotal, options = {}) {
+  const verifiedRecords = records.filter((record) => record.correct);
+  if (!verifiedRecords.length) throw new Error("No verified sales are available to export.");
+
+  const { svg, width, height } = buildSupplierReportSvg(records, summary, grandTotal, options);
 
   const image = new Image();
   image.decoding = "async";

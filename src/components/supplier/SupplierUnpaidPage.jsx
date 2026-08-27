@@ -4,8 +4,11 @@ import { AccessDenied } from "../AccessDenied.jsx";
 import { SupplierExportDialog } from "./SupplierExportDialog.jsx";
 import { SupplierRecordForm } from "./SupplierRecordForm.jsx";
 import { SupplierRecordsTable } from "./SupplierRecordsTable.jsx";
+import { SupplierWithdrawalForm } from "./SupplierWithdrawalForm.jsx";
+import { SupplierWithdrawalsTable } from "./SupplierWithdrawalsTable.jsx";
 import { SupplierSummary } from "./SupplierSummary.jsx";
 import { buildSupplierSummary } from "../../utils/supplierBatch.js";
+import { calculateSupplierNetBalance } from "../../utils/supplierWithdrawals.js";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -13,6 +16,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { NativeSelect } from "@/components/ui/native-select.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
+import { cn } from "@/lib/utils.js";
 
 const filterDefaults = {
   status: "all",
@@ -28,20 +32,27 @@ export function SupplierUnpaidPage({
   loading,
   loadError,
   records = [],
+  withdrawals = [],
   services = [],
+  guilds = [],
   armorTypes = [],
   paidHistory = [],
   permissions = {},
   editing,
   formKey,
+  withdrawalFormKey,
   onSubmitRecord,
   onPatchRecord,
   onDeleteRecord,
+  onSubmitWithdrawal,
+  onPatchWithdrawal,
+  onDeleteWithdrawal,
   onSetEditing,
   onExport,
   onVerifyAll,
   onMarkPaid
 }) {
+  const [subTab, setSubTab] = useState("sales"); // "sales" | "withdrawals"
   const [filters, setFilters] = useState(filterDefaults);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
@@ -61,6 +72,11 @@ export function SupplierUnpaidPage({
   const batchTotal = useMemo(
     () => batchRows.reduce((sum, record) => sum + Number(record.totalCost || 0), 0),
     [batchRows]
+  );
+
+  const balanceStats = useMemo(
+    () => calculateSupplierNetBalance(batchTotal, withdrawals),
+    [batchTotal, withdrawals]
   );
 
   const filteredRecords = useMemo(() => {
@@ -93,7 +109,13 @@ export function SupplierUnpaidPage({
     <section className="tab-panel active">
       <section className="sheet-layout grid-cols-1">
         <Card asChild><article className="sheet-main">
-          <SupplierSummary rows={batchSummary} grandTotal={batchTotal} embedded>
+          <SupplierSummary
+            rows={batchSummary}
+            grandTotal={batchTotal}
+            activeWithdrawalsTotal={balanceStats.activeWithdrawalsTotal}
+            netBalance={balanceStats.netBalance}
+            embedded
+          >
             <Button
               variant="secondary"
               type="button"
@@ -121,104 +143,168 @@ export function SupplierUnpaidPage({
             <span>{records.length} unpaid</span>
           </SupplierSummary>
 
-          <section className="supplier-records-panel" aria-label="Supplier records workspace">
-            {!loading && !loadError && (
-              <>
-                <SupplierRecordForm
-                  key={formKey}
-                  disabled={!permissions.canUseSupplier}
+          {/* Sub-tab Navigation */}
+          <div className="flex items-center justify-between border-b border-border/70 bg-card/60 px-4 py-2.5">
+            <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/30 p-1 text-xs">
+              <button
+                type="button"
+                className={cn(
+                  "rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer",
+                  subTab === "sales"
+                    ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setSubTab("sales")}
+              >
+                Unpaid sales ({records.length})
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer",
+                  subTab === "withdrawals"
+                    ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setSubTab("withdrawals")}
+              >
+                Withdraw Balance ({withdrawals.length})
+              </button>
+            </div>
+
+            {balanceStats.activeWithdrawalsTotal > 0 && (
+              <span className="text-xs font-semibold text-amber-300">
+                {balanceStats.activeWithdrawalsCount} active withdrawal{balanceStats.activeWithdrawalsCount === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+
+          {subTab === "sales" && (
+            <section className="supplier-records-panel" aria-label="Supplier records workspace">
+              {!loading && !loadError && (
+                <>
+                  <SupplierRecordForm
+                    key={formKey}
+                    disabled={!permissions.canUseSupplier}
+                    services={activeServices}
+                    armorTypes={armorTypes}
+                    onSubmit={onSubmitRecord}
+                  />
+
+                  <section className="filter-bar supplier-filter-bar" aria-label="Supplier record filters">
+                    <Label className="filter-search">
+                      Search
+                      <Input
+                        placeholder="Buyer, note, service..."
+                        value={filters.search}
+                        onChange={(event) => updateFilter("search", event.target.value)}
+                      />
+                    </Label>
+                    <Label className="filter-select">
+                      Status
+                      <NativeSelect
+                        value={filters.status}
+                        onChange={(event) => updateFilter("status", event.target.value)}
+                      >
+                        <option value="all">All statuses</option>
+                        <option value="verified">Verified only</option>
+                        <option value="unverified">Unverified only</option>
+                      </NativeSelect>
+                    </Label>
+                    <Label className="filter-select">
+                      Service
+                      <NativeSelect
+                        value={filters.service}
+                        onChange={(event) => updateFilter("service", event.target.value)}
+                      >
+                        <option value="all">All services</option>
+                        {activeServices.map((service) => (
+                          <option key={service.type} value={service.type}>{service.type}</option>
+                        ))}
+                      </NativeSelect>
+                    </Label>
+                    <Label className="filter-select">
+                      Armor stack
+                      <NativeSelect
+                        value={filters.armorType}
+                        onChange={(event) => updateFilter("armorType", event.target.value)}
+                      >
+                        <option value="all">All armor stacks</option>
+                        {armorTypes.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </NativeSelect>
+                    </Label>
+                    <Label className="filter-date">
+                      From
+                      <Input
+                        type="date"
+                        value={filters.dateFrom}
+                        onChange={(event) => updateFilter("dateFrom", event.target.value)}
+                      />
+                    </Label>
+                    <Label className="filter-date">
+                      To
+                      <Input
+                        type="date"
+                        value={filters.dateTo}
+                        onChange={(event) => updateFilter("dateTo", event.target.value)}
+                      />
+                    </Label>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      className="filter-action"
+                      onClick={() => setFilters(filterDefaults)}
+                    >
+                      Clear filters
+                    </Button>
+                  </section>
+                </>
+              )}
+
+              {loading && <div className="space-y-2 p-4" aria-label="Loading unpaid sales records"><Skeleton className="h-10 w-full" /><Skeleton className="h-32 w-full" /></div>}
+              {!loading && loadError && <Alert variant="destructive" className="m-4"><AlertTitle>Could not load unpaid sales</AlertTitle><AlertDescription>{loadError}</AlertDescription></Alert>}
+              {!loading && !loadError && (
+                <SupplierRecordsTable
+                  records={filteredRecords}
                   services={activeServices}
                   armorTypes={armorTypes}
-                  onSubmit={onSubmitRecord}
+                  editing={editing}
+                  onSetEditing={onSetEditing}
+                  permissions={permissions}
+                  onPatchRecord={onPatchRecord}
+                  onDeleteRecord={onDeleteRecord}
                 />
+              )}
+            </section>
+          )}
 
-                <section className="filter-bar supplier-filter-bar" aria-label="Supplier record filters">
-                  <Label className="filter-search">
-                    Search
-                    <Input
-                      placeholder="Buyer, note, service..."
-                      value={filters.search}
-                      onChange={(event) => updateFilter("search", event.target.value)}
-                    />
-                  </Label>
-                  <Label className="filter-select">
-                    Status
-                    <NativeSelect
-                      value={filters.status}
-                      onChange={(event) => updateFilter("status", event.target.value)}
-                    >
-                      <option value="all">All statuses</option>
-                      <option value="verified">Verified only</option>
-                      <option value="unverified">Unverified only</option>
-                    </NativeSelect>
-                  </Label>
-                  <Label className="filter-select">
-                    Service
-                    <NativeSelect
-                      value={filters.service}
-                      onChange={(event) => updateFilter("service", event.target.value)}
-                    >
-                      <option value="all">All services</option>
-                      {activeServices.map((service) => (
-                        <option key={service.type} value={service.type}>{service.type}</option>
-                      ))}
-                    </NativeSelect>
-                  </Label>
-                  <Label className="filter-select">
-                    Armor stack
-                    <NativeSelect
-                      value={filters.armorType}
-                      onChange={(event) => updateFilter("armorType", event.target.value)}
-                    >
-                      <option value="all">All armor stacks</option>
-                      {armorTypes.map((type) => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </NativeSelect>
-                  </Label>
-                  <Label className="filter-date">
-                    From
-                    <Input
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(event) => updateFilter("dateFrom", event.target.value)}
-                    />
-                  </Label>
-                  <Label className="filter-date">
-                    To
-                    <Input
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(event) => updateFilter("dateTo", event.target.value)}
-                    />
-                  </Label>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    className="filter-action"
-                    onClick={() => setFilters(filterDefaults)}
-                  >
-                    Clear filters
-                  </Button>
-                </section>
-              </>
-            )}
-
-            {loading && <div className="space-y-2 p-4" aria-label="Loading unpaid sales records"><Skeleton className="h-10 w-full" /><Skeleton className="h-32 w-full" /></div>}
-            {!loading && loadError && <Alert variant="destructive" className="m-4"><AlertTitle>Could not load unpaid sales</AlertTitle><AlertDescription>{loadError}</AlertDescription></Alert>}
-            {!loading && !loadError && (
-              <SupplierRecordsTable
-                records={filteredRecords}
-                services={activeServices}
-                armorTypes={armorTypes}
-                editing={editing}
-                onSetEditing={onSetEditing}
-                permissions={permissions}
-                onPatchRecord={onPatchRecord}
-                onDeleteRecord={onDeleteRecord}
-              />
-            )}
-          </section>
+          {subTab === "withdrawals" && (
+            <section className="supplier-withdrawals-panel" aria-label="Supplier withdrawals workspace">
+              {!loading && !loadError && (
+                <>
+                  <SupplierWithdrawalForm
+                    key={withdrawalFormKey}
+                    disabled={!permissions.canUseSupplier}
+                    guilds={guilds}
+                    onSubmit={onSubmitWithdrawal}
+                  />
+                  <SupplierWithdrawalsTable
+                    withdrawals={withdrawals}
+                    guilds={guilds}
+                    editing={editing}
+                    onSetEditing={onSetEditing}
+                    permissions={permissions}
+                    onPatchWithdrawal={onPatchWithdrawal}
+                    onDeleteWithdrawal={onDeleteWithdrawal}
+                  />
+                </>
+              )}
+              {loading && <div className="space-y-2 p-4" aria-label="Loading pre-withdrawals"><Skeleton className="h-10 w-full" /><Skeleton className="h-32 w-full" /></div>}
+              {!loading && loadError && <Alert variant="destructive" className="m-4"><AlertTitle>Could not load pre-withdrawals</AlertTitle><AlertDescription>{loadError}</AlertDescription></Alert>}
+            </section>
+          )}
 
           <SupplierExportDialog
             isOpen={exportDialogOpen}

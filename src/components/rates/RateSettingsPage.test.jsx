@@ -34,8 +34,13 @@ function renderPage(overrides = {}) {
     canEditPrices: true,
     supplierServices: mockSupplierServices,
     boosterPrices: mockBoosterPrices,
+    supplierGuilds: [
+      { name: "Main Guild", active: true, isDefault: true },
+      { name: "Alt Guild", active: true, isDefault: false }
+    ],
     supplierRecords: mockSupplierRecords,
     boosterRecords: mockBoosterRecords,
+    supplierWithdrawals: [],
     onAddPriceRow: vi.fn(),
     onTogglePriceRow: vi.fn(),
     onDeletePriceRow: vi.fn(),
@@ -43,6 +48,12 @@ function renderPage(overrides = {}) {
     onUpdatePriceRow: vi.fn(),
     onSaveSupplierPrices: vi.fn((e) => e.preventDefault()),
     onSaveBoosterPrices: vi.fn((e) => e.preventDefault()),
+    onAddGuildRow: vi.fn(),
+    onToggleGuildRow: vi.fn(),
+    onDeleteGuildRow: vi.fn(),
+    onSetDefaultGuildRow: vi.fn(),
+    onUpdateGuildRow: vi.fn(),
+    onSaveSupplierGuilds: vi.fn((e) => e.preventDefault()),
     ...overrides
   };
 
@@ -51,18 +62,21 @@ function renderPage(overrides = {}) {
 }
 
 describe("RateSettingsPage", () => {
-  it("renders compact panels for supplier and booster rates with table headers", () => {
+  it("renders compact panels for supplier, booster rates, and supplier guilds with table headers", () => {
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "Default rates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Default rates & guilds" })).toBeInTheDocument();
     expect(screen.getByText("Admin controls")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Supplier sale rates" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Booster payout rates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Supplier guild names" })).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Add service" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add key level" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add guild" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save supplier defaults" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save booster defaults" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save supplier guilds" })).toBeInTheDocument();
   });
 
   it("shows active rates by default and switches to archived rates on tab click", async () => {
