@@ -39,6 +39,7 @@ import {
   deleteBoosterAdjustment,
   updateSupplierServices,
   updateBoosterPrices,
+  updateArmorTypes,
   getProfitReportData,
   getSessionFromDb,
   saveSessionToDb,
@@ -836,7 +837,39 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { supplierGuilds });
   }
 
+  if (pathname === "/api/prices/armor-types" && req.method === "PUT") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change armor stack options.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const cleaned = cleanArmorRows(body.rows);
+    const armorTypes = await updateArmorTypes(cleaned);
+    return sendJson(res, 200, { armorTypes });
+  }
+
   sendJson(res, 404, { error: "Not found." });
+}
+
+function cleanArmorRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw Object.assign(new Error("Keep at least one armor stack option. Archive options that should no longer be used."), { statusCode: 400 });
+  }
+  const cleaned = rows.map((row) => ({
+    name: String(row.name || "").trim(),
+    active: row.active !== false,
+    isDefault: Boolean(row.isDefault)
+  }));
+  if (cleaned.some((row) => !row.name)) {
+    throw Object.assign(new Error("Every armor stack option needs a name."), { statusCode: 400 });
+  }
+  const seen = new Set();
+  for (const row of cleaned) {
+    const normalizedName = row.name.toLocaleLowerCase();
+    if (seen.has(normalizedName)) {
+      throw Object.assign(new Error("Duplicate armor stack option names are not allowed."), { statusCode: 400 });
+    }
+    seen.add(normalizedName);
+  }
+  return cleaned;
 }
 
 function cleanGuildRows(rows) {

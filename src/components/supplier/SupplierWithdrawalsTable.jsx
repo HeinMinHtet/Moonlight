@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { NativeSelect } from "@/components/ui/native-select.jsx";
 import { cn } from "@/lib/utils.js";
+import { TableDateCell } from "../TableDateCell.jsx";
 import { dateOnly, money } from "../../utils/format.js";
 import { withCurrent } from "../../utils/options.js";
 
@@ -74,7 +75,7 @@ export function SupplierWithdrawalsTable({
             onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
           />
         ) : (
-          <span className="font-mono tabular-nums">{dateOnly(getValue())}</span>
+          <TableDateCell date={getValue()} createdAt={row.original.createdAt} />
         );
       },
       meta: { label: "Date", headClassName: "w-36 text-center", cellClassName: "w-36 text-center" }

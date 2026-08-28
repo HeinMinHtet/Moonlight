@@ -142,7 +142,7 @@ export function buildSupplierReportSvg(records, summary, grandTotal, options = {
     `;
   }).join("");
 
-  const totalLabel = options.totalLabel || "FINAL PRICE";
+  const totalLabel = options.totalLabel || "FINAL SETTLED AMOUNT";
   const summaryTitle = options.summaryTitle || "Sale Summary";
 
   let netTotalCardContent = "";
@@ -156,13 +156,13 @@ export function buildSupplierReportSvg(records, summary, grandTotal, options = {
       ${svgText(money(grandTotal), 1540, summaryStart + 60, { size: 16, weight: 800, color: "#38bdf8", anchor: "end", mono: true })}
 
       <!-- Pre-withdraw Line -->
-      ${svgText("PRE-WITHDRAW DEDUCTED", 996, summaryStart + 86, { size: 12, weight: 700, color: "#f59e0b" })}
+      ${svgText("WITHDRAW BALANCE DEDUCTED", 996, summaryStart + 86, { size: 12, weight: 700, color: "#f59e0b" })}
       ${svgText(`-${money(prewithdrawTotal)}`, 1540, summaryStart + 86, { size: 16, weight: 800, color: "#f59e0b", anchor: "end", mono: true })}
 
       <!-- Divider -->
       <line x1="996" y1="${summaryStart + 100}" x2="1540" y2="${summaryStart + 100}" stroke="#334155" stroke-width="1" stroke-dasharray="4" />
 
-      <!-- Final Price Line -->
+      <!-- Final Settled Amount Line -->
       ${svgText(totalLabel.toUpperCase(), 996, summaryStart + 126, { size: 13, weight: 800, color: "#94a3b8" })}
       ${svgText(`${dateRange}  •  ${verifiedRecords.length} records`, 996, summaryStart + 146, { size: 11, weight: 600, color: "#64748b" })}
       ${svgText(money(finalPrice), 1540, summaryStart + 140, { size: 36, weight: 900, color: finalPrice >= 0 ? "#38bdf8" : "#fb7185", anchor: "end", mono: true })}

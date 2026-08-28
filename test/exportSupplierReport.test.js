@@ -72,9 +72,9 @@ test("buildSupplierReportSvg includes pre-withdraw table and final price breakdo
   // Summary Card assertions
   assert.ok(result.svg.includes("SALES TOTAL"), "Should include SALES TOTAL label");
   assert.ok(result.svg.includes("500"), "Should include grand total");
-  assert.ok(result.svg.includes("PRE-WITHDRAW DEDUCTED"), "Should include PRE-WITHDRAW DEDUCTED label");
+  assert.ok(result.svg.includes("WITHDRAW BALANCE DEDUCTED"), "Should include WITHDRAW BALANCE DEDUCTED label");
   assert.ok(result.svg.includes("-150"), "Should include pre-withdraw deducted amount");
-  assert.ok(result.svg.includes("FINAL PRICE"), "Should include FINAL PRICE label");
+  assert.ok(result.svg.includes("FINAL SETTLED AMOUNT"), "Should include FINAL SETTLED AMOUNT label");
   assert.ok(result.svg.includes("350"), "Should include final price amount");
 });
 
@@ -88,7 +88,7 @@ test("buildSupplierReportSvg omits pre-withdraw table when withdrawals balance i
   assert.equal(resultEmpty.prewithdrawTotal, 0);
   assert.equal(resultEmpty.finalPrice, 500);
   assert.ok(!resultEmpty.svg.includes("Pre-withdraw Balance / Advances"), "Should NOT include Pre-withdraw table when empty");
-  assert.ok(resultEmpty.svg.includes("FINAL PRICE"), "Should include FINAL PRICE label");
+  assert.ok(resultEmpty.svg.includes("FINAL SETTLED AMOUNT"), "Should include FINAL SETTLED AMOUNT label");
   assert.ok(resultEmpty.svg.includes("500"), "Should include final price equal to grandTotal");
 
   // Case B: withdrawals with 0 amount
@@ -129,4 +129,49 @@ test("buildSupplierReportSvg throws if no verified records exist", () => {
   assert.throws(() => {
     buildSupplierReportSvg([{ correct: false }], mockSummary, 0);
   }, /No verified sales are available to export/);
+});
+
+test("buildSupplierReportSvg exports only date and excludes inserted time even if createdAt is present", () => {
+  const salesWithTimestamps = [
+    {
+      id: "s10",
+      date: "2026-08-20",
+      createdAt: "2026-08-20T14:35:10.000Z",
+      buyerName: "AlphaBuyer",
+      serviceType: "Mythic+",
+      quantity: 1,
+      rateAtRecord: 100,
+      armorType: "Cloth",
+      correct: true,
+      totalCost: 100,
+      note: ""
+    }
+  ];
+
+  const withdrawalsWithTimestamps = [
+    {
+      id: "w10",
+      date: "2026-08-19",
+      createdAt: "2026-08-19T08:20:00.000Z",
+      charName: "BankerOne",
+      guild: "Main Guild",
+      amount: 50,
+      note: ""
+    }
+  ];
+
+  const result = buildSupplierReportSvg(
+    salesWithTimestamps,
+    [{ type: "Mythic+", totalQty: 1, price: 100, totalCost: 100 }],
+    100,
+    { withdrawals: withdrawalsWithTimestamps }
+  );
+
+  // SVG contains date strings
+  assert.ok(result.svg.includes("AlphaBuyer"));
+  assert.ok(result.svg.includes("BankerOne"));
+  // Does not contain time strings like "14:35" or "21:35" or "08:20"
+  assert.ok(!result.svg.includes("14:35:10"));
+  assert.ok(!result.svg.includes("21:35"));
+  assert.ok(!result.svg.includes("08:20"));
 });

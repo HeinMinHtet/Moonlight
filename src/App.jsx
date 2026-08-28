@@ -137,6 +137,7 @@ export function App() {
           supplierServices: preserveRateDrafts ? current.supplierServices : (config.supplierServices || []),
           boosterPrices: preserveRateDrafts ? current.boosterPrices : (config.boosterPrices || []),
           supplierGuilds: preserveRateDrafts ? current.supplierGuilds : (config.supplierGuilds || []),
+          armorTypes: preserveRateDrafts ? current.armorTypes : (config.armorTypes || []),
           supplierRecords: supplierPayload
             ? (supplierPayload.records || [])
             : config.permissions.supplierRecords ? current.supplierRecords : [],
@@ -355,7 +356,7 @@ export function App() {
     const activeWithdrawals = (withdrawals || []).filter((w) => !w.settled && Number(w.amount || 0) > 0);
     await exportSupplierReport(batchRows, batchSummary, batchTotal, {
       withdrawals: activeWithdrawals,
-      totalLabel: "FINAL PRICE"
+      totalLabel: "FINAL SETTLED AMOUNT"
     });
     showToast("Supplier report exported.");
   });
@@ -368,7 +369,7 @@ export function App() {
     );
     await exportSupplierReport(batch.records, summary, batch.total, {
       title: "Paid Supplier Batch",
-      totalLabel: "FINAL PRICE",
+      totalLabel: "FINAL SETTLED AMOUNT",
       batchLabel: `Batch ${batch.id}`,
       withdrawals: batchWithdrawals
     });
@@ -581,6 +582,17 @@ export function App() {
     showToast("Supplier guilds saved.");
   });
 
+  const saveArmorTypes = (event) => runAction(async () => {
+    event.preventDefault();
+    validateArmorRows(data.armorTypes);
+    const payload = await request("/api/prices/armor-types", {
+      method: "PUT",
+      body: JSON.stringify({ rows: data.armorTypes })
+    });
+    setData((current) => ({ ...current, armorTypes: payload.armorTypes || [] }));
+    showToast("Armor stack options saved.");
+  });
+
   const updatePriceRow = (collection, index, patch) => {
     setData((current) => ({
       ...current,
@@ -707,6 +719,68 @@ export function App() {
     });
   };
 
+  const addArmorRow = () => {
+    if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit armor stack options.");
+    setData((current) => ({
+      ...current,
+      armorTypes: [...(current.armorTypes || []), { name: "", active: true, isDefault: false }]
+    }));
+  };
+
+  const updateArmorRow = (index, patch) => {
+    setData((current) => ({
+      ...current,
+      armorTypes: (current.armorTypes || []).map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row))
+    }));
+  };
+
+  const toggleArmorRowStatus = (index) => runAction(async () => {
+    const row = (data.armorTypes || [])[index];
+    if (!row) return;
+    const historyRecords = [...data.supplierRecords, ...data.supplierHistory];
+    const historyCount = historyRecords.filter((r) => r.armorType === row.name).length;
+    const archiving = row.active !== false;
+    if (archiving && historyCount > 0) {
+      const confirmed = await askConfirm({
+        title: `Archive ${row.name}?`,
+        body: `${historyCount} sales record${historyCount === 1 ? " uses" : "s use"} this armor stack. Archiving hides it from new sales records but keeps existing records unchanged.`,
+        confirmLabel: "Archive armor stack"
+      });
+      if (!confirmed) return;
+    }
+    setData((current) => ({
+      ...current,
+      armorTypes: current.armorTypes.map((item, rowIndex) => (
+        rowIndex === index ? { ...item, active: !archiving } : item
+      ))
+    }));
+    showToast(archiving ? "Armor stack marked for archive. Save changes to apply." : "Armor stack restored. Save changes to apply.");
+  });
+
+  const deleteArmorRow = (index) => {
+    setData((current) => ({
+      ...current,
+      armorTypes: (current.armorTypes || []).filter((_, rowIndex) => rowIndex !== index)
+    }));
+    showToast("Armor stack removed. Save changes to apply.");
+  };
+
+  const setDefaultArmorRow = (index) => {
+    setData((current) => {
+      const currentRows = current.armorTypes || [];
+      const targetRow = currentRows[index];
+      if (!targetRow) return current;
+      const willBeDefault = !targetRow.isDefault;
+      return {
+        ...current,
+        armorTypes: currentRows.map((row, rowIndex) => ({
+          ...row,
+          isDefault: rowIndex === index ? willBeDefault : false
+        }))
+      };
+    });
+  };
+
   return (
     <main className="shell">
       <a className="skip-link" href="#ledger-content">Skip to ledger content</a>
@@ -821,6 +895,7 @@ export function App() {
             supplierServices={data.supplierServices}
             boosterPrices={data.boosterPrices}
             supplierGuilds={data.supplierGuilds}
+            armorTypes={data.armorTypes}
             supplierRecords={[...data.supplierRecords, ...data.supplierHistory]}
             boosterRecords={data.boosterRecords}
             supplierWithdrawals={data.supplierWithdrawals}
@@ -837,6 +912,12 @@ export function App() {
             onSetDefaultGuildRow={setDefaultGuildRow}
             onUpdateGuildRow={updateGuildRow}
             onSaveSupplierGuilds={saveSupplierGuilds}
+            onAddArmorRow={addArmorRow}
+            onToggleArmorRow={toggleArmorRowStatus}
+            onDeleteArmorRow={deleteArmorRow}
+            onSetDefaultArmorRow={setDefaultArmorRow}
+            onUpdateArmorRow={updateArmorRow}
+            onSaveArmorTypes={saveArmorTypes}
           />
         )}
       </div>
@@ -845,6 +926,13 @@ export function App() {
       <Toaster />
     </main>
   );
+}
+
+function validateArmorRows(rows) {
+  const names = rows.map((row) => String(row.name || "").trim()).filter(Boolean);
+  if (names.length !== rows.length) throw new Error("Every armor stack option needs a name.");
+  const normalizedNames = names.map((name) => name.toLocaleLowerCase());
+  if (new Set(normalizedNames).size !== normalizedNames.length) throw new Error("Duplicate armor stack names are not allowed.");
 }
 
 function validateGuildRows(rows) {

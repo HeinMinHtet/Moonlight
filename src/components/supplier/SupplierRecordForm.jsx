@@ -8,16 +8,20 @@ import { NativeSelect } from "@/components/ui/native-select.jsx";
 
 export function SupplierRecordForm({ disabled, services, armorTypes, onSubmit }) {
   const defaultServiceType = services.find((s) => s.isDefault && s.active !== false)?.type || services.find((s) => s.active !== false)?.type || services[0]?.type || "";
+  const activeArmorList = (armorTypes || [])
+    .map((a) => (typeof a === "string" ? { name: a, active: true, isDefault: a === "No stack" } : a))
+    .filter((a) => a.active !== false);
+  const defaultArmorType = activeArmorList.find((a) => a.isDefault)?.name || activeArmorList[0]?.name || "No stack";
   const [draft, setDraft] = useState(() => ({
     date: today(),
     buyerName: "",
     serviceType: defaultServiceType,
     quantity: "1",
-    armorType: armorTypes[0] || "No stack",
+    armorType: defaultArmorType,
     note: ""
   }));
   const serviceOptions = withCurrent(services.map((service) => service.type), draft.serviceType);
-  const armorOptions = withCurrent(armorTypes, draft.armorType);
+  const armorOptions = withCurrent(activeArmorList.map((a) => a.name), draft.armorType);
   const update = (key) => (event) => setDraft((current) => ({ ...current, [key]: event.target.value }));
 
   const handleKeyDown = (event) => {

@@ -17,13 +17,20 @@ const mockBoosterPrices = [
 ];
 
 const mockSupplierRecords = [
-  { id: "s1", serviceType: "Achievement", rateAtRecord: 1120 },
-  { id: "s2", serviceType: "M0 Bundle", rateAtRecord: 500 },
-  { id: "s3", serviceType: "Legacy Raid", rateAtRecord: 200 }
+  { id: "s1", serviceType: "Achievement", armorType: "Cloth", rateAtRecord: 1120 },
+  { id: "s2", serviceType: "M0 Bundle", armorType: "Plate", rateAtRecord: 500 },
+  { id: "s3", serviceType: "Legacy Raid", armorType: "Cloth", rateAtRecord: 200 }
 ];
 
 const mockBoosterRecords = [
   { id: "b1", level: "M15", payout: 400 }
+];
+
+const mockArmorTypes = [
+  { name: "Cloth", active: true, isDefault: false },
+  { name: "Plate", active: true, isDefault: true },
+  { name: "Unused Armor", active: true, isDefault: false },
+  { name: "Legacy Leather", active: false, isDefault: false }
 ];
 
 function renderPage(overrides = {}) {
@@ -38,6 +45,7 @@ function renderPage(overrides = {}) {
       { name: "Main Guild", active: true, isDefault: true },
       { name: "Alt Guild", active: true, isDefault: false }
     ],
+    armorTypes: mockArmorTypes,
     supplierRecords: mockSupplierRecords,
     boosterRecords: mockBoosterRecords,
     supplierWithdrawals: [],
@@ -54,6 +62,12 @@ function renderPage(overrides = {}) {
     onSetDefaultGuildRow: vi.fn(),
     onUpdateGuildRow: vi.fn(),
     onSaveSupplierGuilds: vi.fn((e) => e.preventDefault()),
+    onAddArmorRow: vi.fn(),
+    onToggleArmorRow: vi.fn(),
+    onDeleteArmorRow: vi.fn(),
+    onSetDefaultArmorRow: vi.fn(),
+    onUpdateArmorRow: vi.fn(),
+    onSaveArmorTypes: vi.fn((e) => e.preventDefault()),
     ...overrides
   };
 
@@ -62,21 +76,24 @@ function renderPage(overrides = {}) {
 }
 
 describe("RateSettingsPage", () => {
-  it("renders compact panels for supplier, booster rates, and supplier guilds with table headers", () => {
+  it("renders compact panels for supplier, booster rates, supplier guilds, and armor stacks with table headers", () => {
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "Default rates & guilds" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Default rates & options" })).toBeInTheDocument();
     expect(screen.getByText("Admin controls")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Supplier sale rates" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Booster payout rates" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Supplier guild names" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Armor stack options" })).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Add service" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add key level" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add guild" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add armor stack" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save supplier defaults" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save booster defaults" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save supplier guilds" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save armor stacks" })).toBeInTheDocument();
   });
 
   it("shows active rates by default and switches to archived rates on tab click", async () => {
@@ -97,6 +114,38 @@ describe("RateSettingsPage", () => {
     // Archived view should show Legacy Raid
     expect(within(supplierForm).getByDisplayValue("Legacy Raid")).toBeInTheDocument();
     expect(within(supplierForm).getByRole("button", { name: "Restore" })).toBeInTheDocument();
+  });
+
+  it("handles armor stack options: active/archived tabs, adding, setting default, and deleting unused options", async () => {
+    const user = userEvent.setup();
+    const props = renderPage();
+
+    // Cloth, Plate, Unused Armor are active
+    expect(screen.getByDisplayValue("Cloth")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Plate")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Unused Armor")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Legacy Leather")).not.toBeInTheDocument();
+
+    // Star default button
+    const starButton = screen.getByRole("button", { name: "Set Cloth as default" });
+    await user.click(starButton);
+    expect(props.onSetDefaultArmorRow).toHaveBeenCalledWith(0);
+
+    // Add armor stack
+    const addArmorBtn = screen.getByRole("button", { name: "Add armor stack" });
+    await user.click(addArmorBtn);
+    expect(props.onAddArmorRow).toHaveBeenCalled();
+
+    // Delete unused armor stack
+    const deleteBtn = screen.getByRole("button", { name: "Delete Unused Armor" });
+    await user.click(deleteBtn);
+    expect(props.onDeleteArmorRow).toHaveBeenCalledWith(2);
+
+    // Switch to archived tab in armor panel
+    const armorForm = screen.getByRole("heading", { name: "Armor stack options" }).closest("form");
+    const archivedTab = within(armorForm).getByRole("button", { name: /Archived/i });
+    await user.click(archivedTab);
+    expect(within(armorForm).getByDisplayValue("Legacy Leather")).toBeInTheDocument();
   });
 
   it("calls onSetDefaultPriceRow when clicking the star default button", async () => {

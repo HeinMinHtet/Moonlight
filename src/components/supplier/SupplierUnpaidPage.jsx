@@ -57,6 +57,10 @@ export function SupplierUnpaidPage({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const activeServices = useMemo(() => services.filter((service) => service.active !== false), [services]);
+  const normalizedArmorTypes = useMemo(
+    () => (armorTypes || []).map((a) => (typeof a === "object" ? a.name : a)),
+    [armorTypes]
+  );
 
   const visibleVerifiedRows = useMemo(
     () => records.filter((record) => record.correct && !record.paid),
@@ -230,7 +234,7 @@ export function SupplierUnpaidPage({
                         onChange={(event) => updateFilter("armorType", event.target.value)}
                       >
                         <option value="all">All armor stacks</option>
-                        {armorTypes.map((type) => (
+                        {normalizedArmorTypes.map((type) => (
                           <option key={type} value={type}>{type}</option>
                         ))}
                       </NativeSelect>
@@ -269,7 +273,7 @@ export function SupplierUnpaidPage({
                 <SupplierRecordsTable
                   records={filteredRecords}
                   services={activeServices}
-                  armorTypes={armorTypes}
+                  armorTypes={normalizedArmorTypes}
                   editing={editing}
                   onSetEditing={onSetEditing}
                   permissions={permissions}
@@ -309,6 +313,7 @@ export function SupplierUnpaidPage({
           <SupplierExportDialog
             isOpen={exportDialogOpen}
             records={records}
+            withdrawals={withdrawals}
             defaultDateFrom={filters.dateFrom}
             defaultDateTo={filters.dateTo}
             onClose={() => setExportDialogOpen(false)}

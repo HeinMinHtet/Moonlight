@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { NativeSelect } from "@/components/ui/native-select.jsx";
 import { cn } from "@/lib/utils.js";
+import { TableDateCell } from "../TableDateCell.jsx";
 import { dateOnly, money } from "../../utils/format.js";
 import { withCurrent, withoutKey } from "../../utils/options.js";
 
@@ -83,7 +84,7 @@ export function BoosterRecordsTable({
         const { draft, setDraft, editing } = table.options.meta;
         return isEditing(row.original, editing)
           ? <Input className="table-edit-field mx-auto w-32 text-center" type="date" value={draft.createdAt || ""} onChange={(event) => setDraft((current) => ({ ...current, createdAt: event.target.value }))} />
-          : <span className="font-mono tabular-nums">{dateOnly(getValue())}</span>;
+          : <TableDateCell date={getValue()} createdAt={row.original.createdAt} />;
       },
       meta: { label: "Date", headClassName: "w-36 text-center", cellClassName: "w-36 text-center" }
     },
@@ -146,7 +147,7 @@ export function BoosterRecordsTable({
     {
       accessorKey: "paidAt",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Paid date" className={centeredHeader} />,
-      cell: ({ getValue }) => getValue() ? <span className="font-mono tabular-nums">{dateOnly(getValue())}</span> : "—",
+      cell: ({ getValue }) => getValue() ? <TableDateCell date={getValue()} createdAt={getValue()} /> : "—",
       meta: { label: "Paid date", headClassName: "w-36 text-center", cellClassName: "w-36 text-center" }
     },
     {

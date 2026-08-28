@@ -123,16 +123,31 @@ test("reconcileWithdrawalSettlement handles full, partial, and deficit settlemen
   assert.equal(res3.unsettledWithdrawals.length, 2);
 });
 
-test("Database supplier guilds and withdrawals CRUD methods", async () => {
+test("Database supplier guilds, armor types, and withdrawals CRUD methods", async () => {
   const {
     getSupplierGuildsList,
     updateSupplierGuilds,
+    getArmorTypesList,
+    updateArmorTypes,
     insertSupplierWithdrawal,
     getSupplierWithdrawalsPayload,
     getSupplierWithdrawalById,
     updateSupplierWithdrawal,
     deleteSupplierWithdrawal
   } = await import("../lib/db.js");
+
+  // Armor Types
+  const initialArmor = await getArmorTypesList();
+  assert.ok(Array.isArray(initialArmor));
+  assert.ok(initialArmor.length >= 1);
+
+  const updatedArmor = await updateArmorTypes([
+    { name: "Mail", active: true, isDefault: false },
+    { name: "Plate", active: true, isDefault: true }
+  ]);
+  assert.equal(updatedArmor.length, 2);
+  assert.equal(updatedArmor[1].name, "Plate");
+  assert.equal(updatedArmor[1].isDefault, true);
 
   // Guilds
   const initialGuilds = await getSupplierGuildsList();

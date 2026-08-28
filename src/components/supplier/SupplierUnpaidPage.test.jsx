@@ -169,13 +169,45 @@ describe("SupplierUnpaidPage", () => {
     expect(within(dialog).getByRole("heading", { name: "Export Supplier Batch PNG" })).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Instant Export (All Verified)" })).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Date Range Export" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("switch", { name: "Include withdraw balance" })).toBeInTheDocument();
 
-    // Instant export action
+    // Instant export action with switch ON (default)
     const instantBtn = within(dialog).getByRole("button", { name: /Instant Export All \(1\)/i });
     await user.click(instantBtn);
 
     expect(onExport).toHaveBeenCalledOnce();
     expect(onExport.mock.calls[0][0]).toEqual([verifiedRecord]);
+    expect(onExport.mock.calls[0][3]).toHaveLength(1); // active withdrawal included
+  });
+
+  it("toggles include withdraw balance off in export dialog and exports without withdrawals", async () => {
+    const user = userEvent.setup();
+    const { onExport } = renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Export batch PNG" }));
+    const dialog = screen.getByRole("dialog");
+    const switchEl = within(dialog).getByRole("switch", { name: "Include withdraw balance" });
+    expect(switchEl).toHaveAttribute("aria-checked", "true");
+
+    // Toggle switch off
+    await user.click(switchEl);
+    expect(switchEl).toHaveAttribute("aria-checked", "false");
+
+    const instantBtn = within(dialog).getByRole("button", { name: /Instant Export All \(1\)/i });
+    await user.click(instantBtn);
+
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(onExport.mock.calls[0][3]).toEqual([]); // empty withdrawals passed
+  });
+
+  it("initializes withdrawal form amount to 1000", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Withdraw Balance (1)" }));
+    const amountInput = screen.getByPlaceholderText("1000");
+    expect(amountInput).toBeInTheDocument();
+    expect(amountInput).toHaveValue(1000);
   });
 
   it("keeps the summary visible while the grouped records workspace is loading", () => {

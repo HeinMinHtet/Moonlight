@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Edit2, Plus, Search, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import { BoosterAdjustmentDialog } from "./BoosterAdjustmentDialog.jsx";
 import { BoosterSettleDialog } from "./BoosterSettleDialog.jsx";
+import { TableDateCell } from "../TableDateCell.jsx";
 import { money } from "../../utils/format.js";
 import { calculateBoosterBalances } from "../../utils/boosterBalance.js";
 import { Badge } from "@/components/ui/badge.jsx";
@@ -305,7 +306,7 @@ export function BoosterBalanceTab({
                 filteredAdjustments.map((adj) => (
                   <tr key={adj.id} className="transition-colors hover:bg-muted/20">
                     <td className="px-4 py-3 font-mono text-muted-foreground whitespace-nowrap">
-                      {adj.date}
+                      <TableDateCell date={adj.date} createdAt={adj.createdAt} className="items-start" />
                     </td>
                     <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                       {adj.boosterName}

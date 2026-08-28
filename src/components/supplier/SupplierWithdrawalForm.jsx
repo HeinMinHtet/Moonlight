@@ -14,7 +14,7 @@ export function SupplierWithdrawalForm({ disabled, guilds = [], onSubmit }) {
     date: today(),
     charName: "",
     guild: defaultGuild,
-    amount: "",
+    amount: "1000",
     note: ""
   }));
 
@@ -61,7 +61,7 @@ export function SupplierWithdrawalForm({ disabled, guilds = [], onSubmit }) {
           type="number"
           min="0.01"
           step="0.01"
-          placeholder="0.00"
+          placeholder="1000"
           value={draft.amount}
           onChange={update("amount")}
           disabled={disabled}

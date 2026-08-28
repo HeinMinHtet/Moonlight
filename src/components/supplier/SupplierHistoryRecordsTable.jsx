@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table/DataTable.jsx";
 import { DataTableColumnHeader } from "@/components/data-table/DataTableColumnHeader.jsx";
+import { TableDateCell } from "../TableDateCell.jsx";
 import { dateOnly, money } from "../../utils/format.js";
 
 export function SupplierHistoryRecordsTable({ records }) {
@@ -17,7 +18,7 @@ export function SupplierHistoryRecordsTable({ records }) {
     {
       accessorKey: "date",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Sale date" />,
-      cell: ({ getValue }) => dateOnly(getValue()),
+      cell: ({ row, getValue }) => <TableDateCell date={getValue()} createdAt={row.original.createdAt} />,
       meta: { label: "Sale date" }
     },
     {
