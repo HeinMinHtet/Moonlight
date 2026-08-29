@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifyAllSupplierRecords } from "../lib/db.js";
+import { unverifyAllSupplierRecords, verifyAllSupplierRecords } from "../lib/db.js";
 import { buildSupplierSummary } from "../src/utils/supplierBatch.js";
 
 test("verifyAllSupplierRecords updates unverified unpaid records", async () => {
   const result = await verifyAllSupplierRecords();
   assert.ok(typeof result.verifiedCount === "number");
+});
+
+test("unverifyAllSupplierRecords updates verified unpaid records", async () => {
+  const result = await unverifyAllSupplierRecords();
+  assert.ok(typeof result.unverifiedCount === "number");
 });
 
 test("buildSupplierSummary calculates correct summary for filtered date range records", () => {

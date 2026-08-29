@@ -23,6 +23,7 @@ import {
   updateSupplierRecord,
   deleteSupplierRecord,
   verifyAllSupplierRecords,
+  unverifyAllSupplierRecords,
   markSupplierRecordsPaid,
   reopenSupplierPaymentBatch,
   getBoosterRecordsPayload,
@@ -389,6 +390,21 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { verifiedCount: result.verifiedCount, records, paidRecords, summary, withdrawals });
   }
 
+  if (pathname === "/api/supplier-records/unverify-all" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can unverify sales records.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const selectedIds = Array.isArray(body.ids)
+      ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
+      : null;
+
+    const result = await unverifyAllSupplierRecords(selectedIds);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+
+    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
+    return sendJson(res, 200, { unverifiedCount: result.unverifiedCount, records, paidRecords, summary, withdrawals });
+  }
+
   if (pathname === "/api/supplier-records/mark-paid" && req.method === "POST") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can mark supplier payments paid.");
     if (!requireCsrf(req, res, session)) return;
@@ -396,8 +412,9 @@ async function handleApi(req, res, url) {
     const selectedIds = Array.isArray(body.ids)
       ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
       : null;
+    const settleWithdrawals = body.settleWithdrawals !== false;
 
-    const result = await markSupplierRecordsPaid(selectedIds, session);
+    const result = await markSupplierRecordsPaid(selectedIds, session, { settleWithdrawals });
     if (result.error) return sendJson(res, 400, { error: result.error });
 
     const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();

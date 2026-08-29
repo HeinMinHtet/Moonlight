@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { CheckCheck } from "lucide-react";
+import { CheckCheck, RotateCcw } from "lucide-react";
 import { AccessDenied } from "../AccessDenied.jsx";
 import { SupplierExportDialog } from "./SupplierExportDialog.jsx";
+import { SupplierBatchPaidDialog } from "./SupplierBatchPaidDialog.jsx";
 import { SupplierRecordForm } from "./SupplierRecordForm.jsx";
 import { SupplierRecordsTable } from "./SupplierRecordsTable.jsx";
 import { SupplierWithdrawalForm } from "./SupplierWithdrawalForm.jsx";
@@ -50,11 +51,13 @@ export function SupplierUnpaidPage({
   onSetEditing,
   onExport,
   onVerifyAll,
+  onUnverifyAll,
   onMarkPaid
 }) {
   const [subTab, setSubTab] = useState("sales"); // "sales" | "withdrawals"
   const [filters, setFilters] = useState(filterDefaults);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [batchPaidDialogOpen, setBatchPaidDialogOpen] = useState(false);
 
   const activeServices = useMemo(() => services.filter((service) => service.active !== false), [services]);
   const normalizedArmorTypes = useMemo(
@@ -130,6 +133,15 @@ export function SupplierUnpaidPage({
               Verify all unpaid ({unverifiedRows.length})
             </Button>
             <Button
+              variant="secondary"
+              type="button"
+              onClick={() => onUnverifyAll?.(visibleVerifiedRows)}
+              disabled={!permissions.canEditSupplierStatus || !visibleVerifiedRows.length}
+            >
+              <RotateCcw className="size-4 mr-1.5" />
+              Unverify all unpaid ({visibleVerifiedRows.length})
+            </Button>
+            <Button
               variant="outline"
               type="button"
               onClick={() => setExportDialogOpen(true)}
@@ -139,7 +151,7 @@ export function SupplierUnpaidPage({
             </Button>
             <Button
               type="button"
-              onClick={() => onMarkPaid(batchRows)}
+              onClick={() => setBatchPaidDialogOpen(true)}
               disabled={!permissions.canMarkSupplierPaid || !batchRows.length}
             >
               Mark batch paid
@@ -318,6 +330,17 @@ export function SupplierUnpaidPage({
             defaultDateTo={filters.dateTo}
             onClose={() => setExportDialogOpen(false)}
             onExport={onExport}
+          />
+
+          <SupplierBatchPaidDialog
+            isOpen={batchPaidDialogOpen}
+            records={batchRows}
+            withdrawals={withdrawals}
+            onClose={() => setBatchPaidDialogOpen(false)}
+            onConfirm={({ settleWithdrawals }) => {
+              setBatchPaidDialogOpen(false);
+              onMarkPaid?.(batchRows, { settleWithdrawals });
+            }}
           />
         </article></Card>
       </section>

@@ -75,6 +75,7 @@ function renderPage(overrides = {}) {
     onSetEditing: vi.fn(),
     onExport: vi.fn(),
     onVerifyAll: vi.fn(),
+    onUnverifyAll: vi.fn(),
     onMarkPaid: vi.fn(),
     ...overrides
   };
@@ -84,13 +85,14 @@ function renderPage(overrides = {}) {
 }
 
 describe("SupplierUnpaidPage", () => {
-  it("renders summary actions including verify all, export, mark paid, and sub-tabs", () => {
+  it("renders summary actions including verify all, unverify all, export, mark paid, and sub-tabs", () => {
     renderPage();
 
     const summaryPanel = screen.getByRole("heading", { name: "Verified unpaid summary" }).closest("aside");
     const recordsWorkspace = screen.getByRole("region", { name: "Supplier records workspace" });
 
-    expect(within(summaryPanel).getByRole("button", { name: /Verify all unpaid \(1\)/i })).toBeInTheDocument();
+    expect(within(summaryPanel).getByRole("button", { name: /^Verify all unpaid \(1\)/i })).toBeInTheDocument();
+    expect(within(summaryPanel).getByRole("button", { name: /^Unverify all unpaid \(1\)/i })).toBeInTheDocument();
     expect(within(summaryPanel).getByRole("button", { name: "Export batch PNG" })).toBeInTheDocument();
     expect(within(summaryPanel).getByRole("button", { name: "Mark batch paid" })).toBeInTheDocument();
     expect(within(summaryPanel).getByText("2 unpaid")).toBeInTheDocument();
@@ -150,11 +152,22 @@ describe("SupplierUnpaidPage", () => {
     const user = userEvent.setup();
     const { onVerifyAll } = renderPage();
 
-    const verifyAllBtn = screen.getByRole("button", { name: /Verify all unpaid \(1\)/i });
+    const verifyAllBtn = screen.getByRole("button", { name: /^Verify all unpaid \(1\)/i });
     await user.click(verifyAllBtn);
 
     expect(onVerifyAll).toHaveBeenCalledOnce();
     expect(onVerifyAll.mock.calls[0][0]).toEqual([reviewRecord]);
+  });
+
+  it("triggers 1-click unverify all unpaid sales when clicking unverify all button", async () => {
+    const user = userEvent.setup();
+    const { onUnverifyAll } = renderPage();
+
+    const unverifyAllBtn = screen.getByRole("button", { name: /^Unverify all unpaid \(1\)/i });
+    await user.click(unverifyAllBtn);
+
+    expect(onUnverifyAll).toHaveBeenCalledOnce();
+    expect(onUnverifyAll.mock.calls[0][0]).toEqual([verifiedRecord]);
   });
 
   it("opens the export dialog and performs instant export or date range export", async () => {
@@ -265,5 +278,64 @@ describe("SupplierUnpaidPage", () => {
         buyerName: "NewBuyerName"
       })
     );
+  });
+
+  it("opens Mark batch paid dialog and confirms settling with withdraw balance", async () => {
+    const user = userEvent.setup();
+    const { onMarkPaid } = renderPage();
+
+    const markPaidBtn = screen.getByRole("button", { name: "Mark batch paid" });
+    await user.click(markPaidBtn);
+
+    // Dialog is open
+    const dialog = screen.getByRole("dialog", { name: "Mark Batch Paid" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("Choose Settlement Option")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Settle with withdraw balance/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Settle without withdraw balance/i })).toBeInTheDocument();
+
+    // Confirm settlement with default (settle with withdraw balance = true)
+    const confirmBtn = within(dialog).getByRole("button", { name: /Confirm Mark Paid/i });
+    await user.click(confirmBtn);
+
+    expect(onMarkPaid).toHaveBeenCalledOnce();
+    expect(onMarkPaid).toHaveBeenCalledWith([verifiedRecord], { settleWithdrawals: true });
+    expect(screen.queryByRole("dialog", { name: "Mark Batch Paid" })).not.toBeInTheDocument();
+  });
+
+  it("opens Mark batch paid dialog, chooses without withdraw balance, and confirms", async () => {
+    const user = userEvent.setup();
+    const { onMarkPaid } = renderPage();
+
+    const markPaidBtn = screen.getByRole("button", { name: "Mark batch paid" });
+    await user.click(markPaidBtn);
+
+    const dialog = screen.getByRole("dialog", { name: "Mark Batch Paid" });
+    const withoutWithdrawBtn = within(dialog).getByRole("button", { name: /Settle without withdraw balance/i });
+    await user.click(withoutWithdrawBtn);
+
+    const confirmBtn = within(dialog).getByRole("button", { name: /Confirm Mark Paid/i });
+    await user.click(confirmBtn);
+
+    expect(onMarkPaid).toHaveBeenCalledOnce();
+    expect(onMarkPaid).toHaveBeenCalledWith([verifiedRecord], { settleWithdrawals: false });
+  });
+
+  it("renders Mark batch paid dialog with no withdrawals message when withdrawals list is empty", async () => {
+    const user = userEvent.setup();
+    const { onMarkPaid } = renderPage({ withdrawals: [] });
+
+    const markPaidBtn = screen.getByRole("button", { name: "Mark batch paid" });
+    await user.click(markPaidBtn);
+
+    const dialog = screen.getByRole("dialog", { name: "Mark Batch Paid" });
+    expect(within(dialog).getByText(/No active pre-withdrawals found/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText("Choose Settlement Option")).not.toBeInTheDocument();
+
+    const confirmBtn = within(dialog).getByRole("button", { name: /Confirm Mark Paid/i });
+    await user.click(confirmBtn);
+
+    expect(onMarkPaid).toHaveBeenCalledOnce();
+    expect(onMarkPaid).toHaveBeenCalledWith([verifiedRecord], { settleWithdrawals: false });
   });
 });

@@ -730,12 +730,24 @@ function bindEvents() {
     const rows = verifiedUnpaidSupplierRows();
     const total = rows.reduce((sum, record) => sum + Number(record.totalCost || 0), 0);
     if (!rows.length) return showToast("No verified unpaid sales to mark paid.");
-    if (!window.confirm(`Mark ${rows.length} verified sales record${rows.length === 1 ? "" : "s"} paid for ${money(total)}? They will move to paid supplier history.`)) return;
+    const activeWithdrawals = (state.supplierWithdrawals || []).filter((w) => !w.settled && Number(w.amount || 0) > 0);
+    const withdrawalsTotal = activeWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0);
+    let settleWithdrawals = false;
+    if (activeWithdrawals.length > 0) {
+      const choice = window.confirm(`Settle with active withdraw balance (-${money(withdrawalsTotal)})?\n\n- Click OK to settle withdraw balance (Net payable: ${money(total - withdrawalsTotal)})\n- Click Cancel to mark paid WITHOUT settling withdraw balance (Gross payable: ${money(total)})`);
+      settleWithdrawals = choice;
+    } else {
+      if (!window.confirm(`Mark ${rows.length} verified sales record${rows.length === 1 ? "" : "s"} paid for ${money(total)}? They will move to paid supplier history.`)) return;
+    }
     await runAction(event, async () => {
-      const payload = await api("/api/supplier-records/mark-paid", { method: "POST" });
+      const payload = await api("/api/supplier-records/mark-paid", {
+        method: "POST",
+        body: JSON.stringify({ ids: rows.map((r) => r.id), settleWithdrawals })
+      });
       state.supplierRecords = payload.records || [];
       state.supplierHistory = payload.paidRecords || [];
       state.supplierSummary = payload.summary || [];
+      state.supplierWithdrawals = payload.withdrawals || [];
       renderSupplierRows();
       renderSupplierHistory();
       renderSummary();

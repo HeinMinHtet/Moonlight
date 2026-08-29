@@ -327,19 +327,18 @@ export function App() {
     showToast(`${payload.verifiedCount || rowsToVerify.length} sales records marked verified.`);
   });
 
-  const markSupplierPaid = (batchRows = verifiedUnpaidSupplierRows) => runAction(async () => {
-    const total = batchRows.reduce((sum, record) => sum + Number(record.totalCost || 0), 0);
-    if (!batchRows.length) return showToast("No verified unpaid sales to mark paid.");
-    const warnings = supplierBatchWarnings(batchRows);
+  const unverifyAllSupplierSales = (verifiedRows) => runAction(async () => {
+    const rowsToUnverify = verifiedRows || data.supplierRecords.filter((record) => record.correct && !record.paid);
+    if (!rowsToUnverify.length) return showToast("No verified unpaid sales to unverify.");
     const confirmed = await askConfirm({
-      title: "Mark verified sales paid?",
-      body: `${batchRows.length} verified sales record${batchRows.length === 1 ? "" : "s"} will move to paid supplier history. Total: ${money(total)}.${warnings.length ? ` Review warning: ${warnings.join(" ")}` : ""}`,
-      confirmLabel: "Mark paid"
+      title: "Unverify all unpaid sales?",
+      body: `${rowsToUnverify.length} verified sales record${rowsToUnverify.length === 1 ? "" : "s"} will be marked as unverified.`,
+      confirmLabel: "Unverify all"
     });
     if (!confirmed) return;
-    const payload = await request("/api/supplier-records/mark-paid", {
+    const payload = await request("/api/supplier-records/unverify-all", {
       method: "POST",
-      body: JSON.stringify({ ids: batchRows.map((record) => record.id) })
+      body: JSON.stringify({ ids: rowsToUnverify.map((record) => record.id) })
     });
     setData((current) => ({
       ...current,
@@ -348,7 +347,28 @@ export function App() {
       supplierSummary: payload.summary || [],
       supplierWithdrawals: payload.withdrawals || []
     }));
-    showToast(`${payload.paidCount || batchRows.length} supplier records moved to paid history.`);
+    showToast(`${payload.unverifiedCount || rowsToUnverify.length} sales records marked unverified.`);
+  });
+
+  const markSupplierPaid = (batchRows = verifiedUnpaidSupplierRows, options = {}) => runAction(async () => {
+    if (!batchRows.length) return showToast("No verified unpaid sales to mark paid.");
+    const settleWithdrawals = options.settleWithdrawals !== false;
+    const payload = await request("/api/supplier-records/mark-paid", {
+      method: "POST",
+      body: JSON.stringify({
+        ids: batchRows.map((record) => record.id),
+        settleWithdrawals
+      })
+    });
+    setData((current) => ({
+      ...current,
+      supplierRecords: payload.records || [],
+      supplierHistory: payload.paidRecords || [],
+      supplierSummary: payload.summary || [],
+      supplierWithdrawals: payload.withdrawals || []
+    }));
+    const settlementMsg = settleWithdrawals ? " with withdraw balance settled" : " without settling withdraw balance";
+    showToast(`${payload.paidCount || batchRows.length} supplier records moved to paid history${settlementMsg}.`);
   });
 
   const exportSupplierPng = (batchRows = verifiedUnpaidSupplierRows, batchSummary = data.supplierSummary, batchTotal = supplierGrandTotal, withdrawals = data.supplierWithdrawals) => runAction(async () => {
@@ -841,6 +861,7 @@ export function App() {
             onSetEditing={setEditing}
             onExport={exportSupplierPng}
             onVerifyAll={verifyAllSupplierSales}
+            onUnverifyAll={unverifyAllSupplierSales}
             onMarkPaid={markSupplierPaid}
           />
         )}

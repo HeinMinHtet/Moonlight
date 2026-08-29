@@ -197,3 +197,81 @@ test("Database supplier guilds, armor types, and withdrawals CRUD methods", asyn
   assert.equal(afterDelete, null);
 });
 
+test("markSupplierRecordsPaid with settleWithdrawals true vs false", async () => {
+  const {
+    insertSupplierRecord,
+    deleteSupplierRecord,
+    insertSupplierWithdrawal,
+    getSupplierWithdrawalById,
+    deleteSupplierWithdrawal,
+    markSupplierRecordsPaid,
+    getSupplierRecordsPayload
+  } = await import("../lib/db.js");
+
+  const session = { discordId: "admin-1", username: "AdminUser" };
+
+  // 1. Create a withdrawal
+  const withdrawal = await insertSupplierWithdrawal({
+    charName: "SettleTestBanker",
+    guild: "Test Guild",
+    amount: 500,
+    date: "2026-08-28",
+    note: "Settlement test"
+  });
+
+  // 2. Create first sales record
+  const record1 = {
+    id: "test-rec-settle-1",
+    date: "2026-08-28",
+    buyerName: "Buyer1",
+    serviceType: "M+ 10",
+    quantity: 2,
+    armorType: "No stack",
+    correct: true,
+    paid: false,
+    rateAtRecord: 300,
+    totalCost: 600,
+    createdAt: new Date().toISOString()
+  };
+  await insertSupplierRecord(record1);
+
+  // Test: Mark paid WITHOUT settling withdrawals
+  const markRes1 = await markSupplierRecordsPaid(new Set([record1.id]), session, { settleWithdrawals: false });
+  assert.equal(markRes1.paidCount, 1);
+
+  // Check withdrawal is still unsettled
+  const wAfterFirstPay = await getSupplierWithdrawalById(withdrawal.id);
+  assert.equal(wAfterFirstPay.settled, false);
+  assert.equal(wAfterFirstPay.amount, 500);
+
+  // 3. Create second sales record
+  const record2 = {
+    id: "test-rec-settle-2",
+    date: "2026-08-28",
+    buyerName: "Buyer2",
+    serviceType: "M+ 10",
+    quantity: 2,
+    armorType: "No stack",
+    correct: true,
+    paid: false,
+    rateAtRecord: 400,
+    totalCost: 800,
+    createdAt: new Date().toISOString()
+  };
+  await insertSupplierRecord(record2);
+
+  // Test: Mark paid WITH settling withdrawals (default / settleWithdrawals: true)
+  const markRes2 = await markSupplierRecordsPaid(new Set([record2.id]), session, { settleWithdrawals: true });
+  assert.equal(markRes2.paidCount, 1);
+
+  // Check withdrawal is now settled
+  const wAfterSecondPay = await getSupplierWithdrawalById(withdrawal.id);
+  assert.equal(wAfterSecondPay.settled, true);
+  assert.equal(wAfterSecondPay.settlementBatchId, markRes2.paymentBatchId);
+
+  // Cleanup
+  await deleteSupplierRecord(record1.id);
+  await deleteSupplierRecord(record2.id);
+  await deleteSupplierWithdrawal(withdrawal.id);
+});
+
