@@ -46,7 +46,7 @@ export function SupplierRecordsTable({
       serviceType: record.serviceType || "",
       quantity: record.quantity ?? 1,
       rateAtRecord: record.rateAtRecord ?? 0,
-      armorType: record.armorType || "",
+      armorType: record.armorType || (typeof armorTypes?.[0] === "string" ? armorTypes[0] : armorTypes?.[0]?.name) || "No stack",
       note: record.note || ""
     });
   }, [editingKey]);

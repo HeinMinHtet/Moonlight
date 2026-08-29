@@ -343,8 +343,10 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: "Choose an active service for this sales record." });
     }
     const armorTypes = await getArmorTypesList();
-    const armorType = String(body.armorType || "No stack").trim();
-    if (!armorTypes.includes(armorType)) return sendJson(res, 400, { error: "Choose a valid armor stack." });
+    const defaultArmor = armorTypes.find((item) => item.isDefault)?.name || armorTypes.find((item) => item.active !== false)?.name || "No stack";
+    const armorType = String(body.armorType || defaultArmor).trim();
+    const armorExists = armorTypes.some((armor) => (typeof armor === "object" ? armor.name : armor) === armorType && (typeof armor === "object" ? armor.active !== false : true));
+    if (!armorExists) return sendJson(res, 400, { error: "Choose a valid armor stack." });
 
     const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
     if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid sales record date." });
@@ -524,7 +526,7 @@ async function handleApi(req, res, url) {
     if ("serviceType" in body) {
       const serviceType = String(body.serviceType || "").trim();
       const services = await getSupplierServicesList();
-      const serviceExists = services.some((service) => service.active !== false && service.type === serviceType);
+      const serviceExists = services.some((service) => (typeof service === "object" ? service.type : service) === serviceType);
       if (!serviceExists) return sendJson(res, 400, { error: "Choose a valid service for this sales record." });
       updates.serviceType = serviceType;
     }
@@ -536,7 +538,8 @@ async function handleApi(req, res, url) {
     if ("armorType" in body) {
       const armorType = String(body.armorType || "").trim();
       const armorTypes = await getArmorTypesList();
-      if (!armorTypes.includes(armorType)) return sendJson(res, 400, { error: "Choose a valid armor stack." });
+      const armorExists = armorTypes.some((armor) => (typeof armor === "object" ? armor.name : armor) === armorType);
+      if (!armorExists) return sendJson(res, 400, { error: "Choose a valid armor stack." });
       updates.armorType = armorType;
     }
     if ("rateAtRecord" in body) {
