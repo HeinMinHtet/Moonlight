@@ -10,6 +10,7 @@ import { SupplierWithdrawalsTable } from "./SupplierWithdrawalsTable.jsx";
 import { SupplierSummary } from "./SupplierSummary.jsx";
 import { buildSupplierSummary } from "../../utils/supplierBatch.js";
 import { calculateSupplierNetBalance } from "../../utils/supplierWithdrawals.js";
+import { money } from "../../utils/format.js";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -55,6 +56,7 @@ export function SupplierUnpaidPage({
   onMarkPaid
 }) {
   const [subTab, setSubTab] = useState("sales"); // "sales" | "withdrawals"
+  const [withdrawalStatusTab, setWithdrawalStatusTab] = useState("active"); // "active" | "settled"
   const [filters, setFilters] = useState(filterDefaults);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [batchPaidDialogOpen, setBatchPaidDialogOpen] = useState(false);
@@ -63,6 +65,15 @@ export function SupplierUnpaidPage({
   const normalizedArmorTypes = useMemo(
     () => (armorTypes || []).map((a) => (typeof a === "object" ? a.name : a)),
     [armorTypes]
+  );
+
+  const activeWithdrawals = useMemo(
+    () => withdrawals.filter((w) => !w.settled),
+    [withdrawals]
+  );
+  const settledWithdrawals = useMemo(
+    () => withdrawals.filter((w) => Boolean(w.settled)),
+    [withdrawals]
   );
 
   const visibleVerifiedRows = useMemo(
@@ -300,21 +311,81 @@ export function SupplierUnpaidPage({
             <section className="supplier-withdrawals-panel" aria-label="Supplier withdrawals workspace">
               {!loading && !loadError && (
                 <>
-                  <SupplierWithdrawalForm
-                    key={withdrawalFormKey}
-                    disabled={!permissions.canUseSupplier}
-                    guilds={guilds}
-                    onSubmit={onSubmitWithdrawal}
-                  />
-                  <SupplierWithdrawalsTable
-                    withdrawals={withdrawals}
-                    guilds={guilds}
-                    editing={editing}
-                    onSetEditing={onSetEditing}
-                    permissions={permissions}
-                    onPatchWithdrawal={onPatchWithdrawal}
-                    onDeleteWithdrawal={onDeleteWithdrawal}
-                  />
+                  {/* Segmented active / settled tab bar */}
+                  <div className="flex items-center justify-between border-b border-border/70 bg-card/60 px-4 py-2.5">
+                    <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/30 p-1 text-xs">
+                      <button
+                        type="button"
+                        className={cn(
+                          "rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer",
+                          withdrawalStatusTab === "active"
+                            ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => setWithdrawalStatusTab("active")}
+                      >
+                        Active balance ({activeWithdrawals.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(
+                          "rounded-lg px-3 py-1.5 font-medium transition-all cursor-pointer",
+                          withdrawalStatusTab === "settled"
+                            ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => setWithdrawalStatusTab("settled")}
+                      >
+                        Settled balance ({settledWithdrawals.length})
+                      </button>
+                    </div>
+
+                    <div className="text-xs font-mono font-semibold">
+                      {withdrawalStatusTab === "active" ? (
+                        <span className="text-amber-300">
+                          Active total: {money(balanceStats.activeWithdrawalsTotal)}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400">
+                          Settled total: {money(balanceStats.settledWithdrawalsTotal)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {withdrawalStatusTab === "active" && (
+                    <>
+                      <SupplierWithdrawalForm
+                        key={withdrawalFormKey}
+                        disabled={!permissions.canUseSupplier}
+                        guilds={guilds}
+                        onSubmit={onSubmitWithdrawal}
+                      />
+                      <SupplierWithdrawalsTable
+                        withdrawals={activeWithdrawals}
+                        guilds={guilds}
+                        editing={editing}
+                        onSetEditing={onSetEditing}
+                        permissions={permissions}
+                        onPatchWithdrawal={onPatchWithdrawal}
+                        onDeleteWithdrawal={onDeleteWithdrawal}
+                        emptyMessage="No active pre-withdrawals recorded yet."
+                      />
+                    </>
+                  )}
+
+                  {withdrawalStatusTab === "settled" && (
+                    <SupplierWithdrawalsTable
+                      withdrawals={settledWithdrawals}
+                      guilds={guilds}
+                      editing={editing}
+                      onSetEditing={onSetEditing}
+                      permissions={permissions}
+                      onPatchWithdrawal={onPatchWithdrawal}
+                      onDeleteWithdrawal={onDeleteWithdrawal}
+                      emptyMessage="No settled pre-withdrawals recorded yet."
+                    />
+                  )}
                 </>
               )}
               {loading && <div className="space-y-2 p-4" aria-label="Loading pre-withdrawals"><Skeleton className="h-10 w-full" /><Skeleton className="h-32 w-full" /></div>}

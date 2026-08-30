@@ -122,6 +122,50 @@ describe("SupplierUnpaidPage", () => {
     expect(within(withdrawalsWorkspace).getAllByText("Main Guild").length).toBeGreaterThan(0);
   });
 
+  it("separates active balance and settled balance sub-tabs in withdraw balance", async () => {
+    const user = userEvent.setup();
+    renderPage({
+      withdrawals: [
+        {
+          id: "w1",
+          date: "2026-08-20",
+          charName: "ActiveBanker",
+          guild: "Main Guild",
+          amount: 50,
+          note: "Active pre-withdrawal",
+          settled: false
+        },
+        {
+          id: "w2",
+          date: "2026-08-19",
+          charName: "SettledBanker",
+          guild: "Alt Guild",
+          amount: 75,
+          note: "Settled pre-withdrawal",
+          settled: true,
+          settledAt: "2026-08-20T00:00:00.000Z"
+        }
+      ]
+    });
+
+    await user.click(screen.getByRole("button", { name: "Withdraw Balance (2)" }));
+
+    // Default to Active balance tab
+    expect(screen.getByRole("button", { name: "Active balance (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settled balance (1)" })).toBeInTheDocument();
+    expect(screen.getByText("Active total: 50")).toBeInTheDocument();
+    expect(screen.getByText("ActiveBanker")).toBeInTheDocument();
+    expect(screen.queryByText("SettledBanker")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record withdrawal" })).toBeInTheDocument();
+
+    // Switch to Settled balance tab
+    await user.click(screen.getByRole("button", { name: "Settled balance (1)" }));
+    expect(screen.getByText("Settled total: 75")).toBeInTheDocument();
+    expect(screen.getByText("SettledBanker")).toBeInTheDocument();
+    expect(screen.queryByText("ActiveBanker")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record withdrawal" })).not.toBeInTheDocument();
+  });
+
   it("filters sales records by search text and status", async () => {
     const user = userEvent.setup();
     renderPage();

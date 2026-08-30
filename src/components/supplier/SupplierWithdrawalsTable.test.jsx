@@ -110,4 +110,13 @@ describe("SupplierWithdrawalsTable", () => {
 
     expect(onDeleteWithdrawal).toHaveBeenCalledWith(mockWithdrawals[0]);
   });
+
+  it("renders custom emptyMessage when withdrawals is empty", () => {
+    renderTable({
+      withdrawals: [],
+      emptyMessage: "No active pre-withdrawals recorded yet."
+    });
+
+    expect(screen.getByText("No active pre-withdrawals recorded yet.")).toBeInTheDocument();
+  });
 });

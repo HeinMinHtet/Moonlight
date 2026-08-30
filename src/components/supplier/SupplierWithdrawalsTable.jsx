@@ -28,7 +28,8 @@ export function SupplierWithdrawalsTable({
   onSetEditing,
   permissions = {},
   onPatchWithdrawal,
-  onDeleteWithdrawal
+  onDeleteWithdrawal,
+  emptyMessage = "No pre-withdrawals recorded yet."
 }) {
   const [sorting, setSorting] = useState([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
@@ -244,7 +245,7 @@ export function SupplierWithdrawalsTable({
   return (
     <DataTable
       table={table}
-      emptyMessage="No pre-withdrawals recorded yet."
+      emptyMessage={emptyMessage}
       tableClassName="min-w-[64rem]"
       getRowClassName={(row) => cn(
         !row.original.settled && "status-row-review",
