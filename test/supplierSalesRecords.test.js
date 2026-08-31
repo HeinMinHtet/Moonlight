@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  initDb,
   insertSupplierRecord,
   updateSupplierRecord,
   deleteSupplierRecord,
@@ -8,6 +9,7 @@ import {
 } from "../lib/db.js";
 
 test("Supplier sales records creation and editing with armor types", async () => {
+  await initDb();
   const armorTypes = await getArmorTypesList();
   assert.ok(Array.isArray(armorTypes));
   assert.ok(armorTypes.length >= 1);

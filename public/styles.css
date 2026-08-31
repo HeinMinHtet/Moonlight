@@ -896,6 +896,10 @@ td .table-edit[type="number"] {
   grid-template-columns: 180px 120px minmax(220px, 1fr) 140px;
 }
 
+.admin-booster-entry {
+  grid-template-columns: 140px minmax(160px, 1.2fr) 150px 90px minmax(160px, 1.5fr) 140px;
+}
+
 .booster-workspace { overflow: hidden; }
 
 .booster-stat-bar strong { color: var(--blue-text); }

@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { Edit2, Plus, Search, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { Banknote, Edit2, Lock, Plus, Search, Trash2, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { BoosterAdjustmentDialog } from "./BoosterAdjustmentDialog.jsx";
 import { BoosterSettleDialog } from "./BoosterSettleDialog.jsx";
+import { BoosterVaultWithdrawDialog } from "./BoosterVaultWithdrawDialog.jsx";
 import { TableDateCell } from "../TableDateCell.jsx";
-import { money } from "../../utils/format.js";
-import { calculateBoosterBalances } from "../../utils/boosterBalance.js";
+import { mmk, money } from "../../utils/format.js";
+import { calculateBoosterBalances, calculateBoosterVaultBalances } from "../../utils/boosterBalance.js";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -14,12 +15,14 @@ import { cn } from "@/lib/utils.js";
 export function BoosterBalanceTab({
   records = [],
   adjustments = [],
+  vaultTransactions = [],
   isAdmin,
   permissions,
   onAddAdjustment,
   onUpdateAdjustment,
   onDeleteAdjustment,
   onSettleBooster,
+  onWithdrawVaultCash,
   onAskConfirm
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,12 +32,38 @@ export function BoosterBalanceTab({
   const [editingAdjustment, setEditingAdjustment] = useState(null);
   const [isSettleOpen, setIsSettleOpen] = useState(false);
   const [settleBoosterData, setSettleBoosterData] = useState(null);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [withdrawBoosterData, setWithdrawBoosterData] = useState(null);
 
   // Compute aggregated balances per booster
-  const boosterBalances = useMemo(
+  const rawBoosterBalances = useMemo(
     () => calculateBoosterBalances(records, adjustments),
     [records, adjustments]
   );
+
+  const vaultBalances = useMemo(
+    () => calculateBoosterVaultBalances(vaultTransactions),
+    [vaultTransactions]
+  );
+
+  const vaultMap = useMemo(() => {
+    const map = new Map();
+    for (const v of vaultBalances) {
+      const key = v.discordId || v.boosterName;
+      map.set(key, v.currentVaultBalance);
+      if (v.discordId) map.set(v.discordId, v.currentVaultBalance);
+      if (v.boosterName) map.set(v.boosterName, v.currentVaultBalance);
+    }
+    return map;
+  }, [vaultBalances]);
+
+  const boosterBalances = useMemo(() => {
+    return rawBoosterBalances.map((b) => {
+      const key = b.discordId || b.boosterName;
+      const storedCash = vaultMap.get(key) || (b.discordId ? vaultMap.get(b.discordId) : 0) || (b.boosterName ? vaultMap.get(b.boosterName) : 0) || 0;
+      return { ...b, storedCash };
+    });
+  }, [rawBoosterBalances, vaultMap]);
 
   const filteredBalances = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -55,13 +84,29 @@ export function BoosterBalanceTab({
     );
   }, [adjustments, searchQuery]);
 
+  const filteredVaultTransactions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return vaultTransactions;
+    return vaultTransactions.filter(
+      (tx) =>
+        tx.boosterName.toLowerCase().includes(q) ||
+        tx.note.toLowerCase().includes(q) ||
+        (tx.paymentMethod && tx.paymentMethod.toLowerCase().includes(q)) ||
+        (tx.createdByName && tx.createdByName.toLowerCase().includes(q))
+    );
+  }, [vaultTransactions, searchQuery]);
+
   const totalCurrentBalance = boosterBalances.reduce((sum, b) => sum + b.currentBalance, 0);
-  const totalOpenRuns = boosterBalances.reduce((sum, b) => sum + b.openRunsTotal, 0);
-  const totalNetAdjustments = boosterBalances.reduce((sum, b) => sum + b.adjustmentsTotal, 0);
+  const totalStoredCash = boosterBalances.reduce((sum, b) => sum + Number(b.storedCash || 0), 0);
 
   const handleOpenSettleDialog = (booster) => {
     setSettleBoosterData(booster);
     setIsSettleOpen(true);
+  };
+
+  const handleOpenWithdrawDialog = (booster) => {
+    setWithdrawBoosterData(booster);
+    setIsWithdrawOpen(true);
   };
 
   const handleConfirmSettle = async (payload) => {
@@ -69,6 +114,13 @@ export function BoosterBalanceTab({
       await onSettleBooster(payload);
     }
     setIsSettleOpen(false);
+  };
+
+  const handleConfirmWithdraw = async (payload) => {
+    if (onWithdrawVaultCash) {
+      await onWithdrawVaultCash(payload);
+    }
+    setIsWithdrawOpen(false);
   };
 
   const handleOpenCreateDialog = (booster = null) => {
@@ -117,7 +169,7 @@ export function BoosterBalanceTab({
         <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
           <Input
-            placeholder="Search booster name, reason, or admin..."
+            placeholder="Search booster name, reason, channel, or admin..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 h-9 text-xs sm:text-sm bg-popover/80 rounded-xl"
@@ -142,12 +194,15 @@ export function BoosterBalanceTab({
           <div>
             <h3 className="text-base font-bold text-foreground">Booster Current Balances</h3>
             <p className="text-xs text-muted-foreground">
-              Aggregated unpaid Mythic+ runs and manual balance adjustments per booster.
+              Unpaid Mythic+ run balances, gold adjustments, and held cash vaults in MMK.
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
             <span className="text-muted-foreground">
-              Total Owed: <strong className="text-foreground text-sm font-mono">{money(totalCurrentBalance)}</strong>
+              Total Gold Owed: <strong className="text-foreground text-sm font-mono">{money(totalCurrentBalance)}</strong>
+            </span>
+            <span className="text-muted-foreground">
+              Total Held MMK: <strong className="text-emerald-400 text-sm font-mono">{mmk(totalStoredCash)}</strong>
             </span>
             <Badge variant="admin">{boosterBalances.length} Boosters</Badge>
           </div>
@@ -160,15 +215,16 @@ export function BoosterBalanceTab({
                 <th className="px-4 py-3">Booster</th>
                 <th className="px-4 py-3 text-right">Unpaid Runs</th>
                 <th className="px-4 py-3 text-right">Net Adjustments</th>
-                <th className="px-4 py-3 text-right">Current Balance</th>
-                <th className="px-4 py-3 text-right">Lifetime Paid</th>
+                <th className="px-4 py-3 text-right">Run Balance</th>
+                <th className="px-4 py-3 text-right">Stored Cash (MMK)</th>
+                <th className="px-4 py-3 text-right">Lifetime Gold Paid</th>
                 <th className="px-4 py-3 text-right pr-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 font-medium">
               {filteredBalances.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
+                  <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
                     No booster balances match the search query.
                   </td>
                 </tr>
@@ -181,6 +237,11 @@ export function BoosterBalanceTab({
                         {b.currentBalance < 0 && (
                           <Badge variant="destructive" className="text-[10px] py-0 px-1">
                             In Deficit
+                          </Badge>
+                        )}
+                        {b.storedCash > 0 && (
+                          <Badge variant="outline" className="text-[10px] py-0 px-1 border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
+                            Vault Active
                           </Badge>
                         )}
                       </div>
@@ -216,12 +277,22 @@ export function BoosterBalanceTab({
                         {money(b.currentBalance)}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      {b.storedCash > 0 ? (
+                        <span className="text-emerald-400 text-sm sm:text-base">
+                          {mmk(b.storedCash)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs font-normal">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-mono text-xs sm:text-sm text-muted-foreground">
                       {money(b.paidRunsTotal)}
                     </td>
                     <td className="px-4 py-3 text-right pr-4">
                       {isAdmin && (
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Settle Run Balance Button */}
                           {b.currentBalance > 0 ? (
                             <Button
                               variant="default"
@@ -230,6 +301,7 @@ export function BoosterBalanceTab({
                               className="h-7 px-2.5 text-xs font-bold shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white"
                               onClick={() => handleOpenSettleDialog(b)}
                               disabled={!permissions.canMarkBoosterPaid}
+                              title="Settle runs (Pay Now or Hold in Vault)"
                             >
                               Pay Balance
                             </Button>
@@ -246,9 +318,27 @@ export function BoosterBalanceTab({
                             </Button>
                           ) : (
                             <Badge variant="neutral" className="text-[10px] py-0.5 px-2 font-mono">
-                              Settled
+                              Runs Clear
                             </Badge>
                           )}
+
+                          {/* Release Stored Cash Button */}
+                          {b.storedCash > 0 && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              type="button"
+                              className="h-7 px-2.5 text-xs font-bold shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1"
+                              onClick={() => handleOpenWithdrawDialog(b)}
+                              disabled={!permissions.canMarkBoosterPaid}
+                              title="Release held MMK cash to booster"
+                            >
+                              <Banknote className="size-3" aria-hidden="true" />
+                              Release MMK
+                            </Button>
+                          )}
+
+                          {/* Manual Gold Adjustment Button */}
                           <Button
                             variant="outline"
                             size="sm"
@@ -270,16 +360,21 @@ export function BoosterBalanceTab({
         </div>
       </Card>
 
-      {/* Adjustments Audit Log / Ledger Table */}
+      {/* Stored Cash Vault (MMK) Audit Log Table */}
       <Card className="overflow-hidden border-border/80 bg-card/90">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4 bg-muted/20">
-          <div>
-            <h3 className="text-base font-bold text-foreground">Balance Adjustment Audit Log</h3>
-            <p className="text-xs text-muted-foreground">
-              History of manual credits, advance payouts, bonuses, and penalty deductions.
-            </p>
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Lock className="size-4" aria-hidden="true" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground">Stored Cash Vault (MMK) Ledger</h3>
+              <p className="text-xs text-muted-foreground">
+                History of gold converted into stored MMK and cash released to boosters.
+              </p>
+            </div>
           </div>
-          <Badge variant="neutral">{filteredAdjustments.length} Records</Badge>
+          <Badge variant="success" className="font-bold">{filteredVaultTransactions.length} Vault Records</Badge>
         </div>
 
         <div className="overflow-x-auto">
@@ -289,7 +384,88 @@ export function BoosterBalanceTab({
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Booster</th>
                 <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3 text-right">Amount</th>
+                <th className="px-4 py-3 text-right">Amount (MMK)</th>
+                <th className="px-4 py-3 text-right">Gold & Rate</th>
+                <th className="px-4 py-3">Channel / Note</th>
+                <th className="px-4 py-3">Processed By</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40 font-medium text-xs sm:text-sm">
+              {filteredVaultTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
+                    No stored cash vault transactions recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                filteredVaultTransactions.map((tx) => (
+                  <tr key={tx.id} className="transition-colors hover:bg-muted/20">
+                    <td className="px-4 py-3 font-mono text-muted-foreground whitespace-nowrap">
+                      <TableDateCell date={tx.date} createdAt={tx.createdAt} className="items-start" />
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
+                      {tx.boosterName}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {tx.type === "deposit" ? (
+                        <Badge variant="outline" className="gap-1 text-[11px] font-bold border-amber-500/40 text-amber-300 bg-amber-500/10">
+                          <Lock className="size-3" aria-hidden="true" />
+                          + Vault Deposit
+                        </Badge>
+                      ) : (
+                        <Badge variant="success" className="gap-1 text-[11px] font-bold">
+                          <Banknote className="size-3" aria-hidden="true" />
+                          - Cash Released
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">
+                      <span className={tx.type === "deposit" ? "text-amber-300" : "text-emerald-400"}>
+                        {tx.type === "deposit" ? `+${mmk(tx.amount)}` : `-${mmk(tx.amount)}`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">
+                      {tx.type === "deposit" && tx.goldAmount > 0 ? (
+                        <span>{money(tx.goldAmount)} Gold @ {tx.rate} MMK</span>
+                      ) : (
+                        <span>-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/90 max-w-xs truncate" title={tx.note}>
+                      {tx.paymentMethod ? <Badge variant="neutral" className="mr-1.5 text-[10px] py-0">{tx.paymentMethod}</Badge> : null}
+                      {tx.note}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {tx.createdByName || "Admin"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Adjustments Audit Log / Ledger Table */}
+      <Card className="overflow-hidden border-border/80 bg-card/90">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4 bg-muted/20">
+          <div>
+            <h3 className="text-base font-bold text-foreground">Balance Adjustment Audit Log</h3>
+            <p className="text-xs text-muted-foreground">
+              History of manual gold credits, advance gold deductions, and penalties.
+            </p>
+          </div>
+          <Badge variant="neutral">{filteredAdjustments.length} Gold Adjustments</Badge>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border/80 bg-muted/40 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Booster</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3 text-right">Gold Amount</th>
                 <th className="px-4 py-3">Reason / Note</th>
                 <th className="px-4 py-3">Adjusted By</th>
                 {isAdmin && <th className="px-4 py-3 text-right pr-4">Actions</th>}
@@ -373,7 +549,7 @@ export function BoosterBalanceTab({
         </div>
       </Card>
 
-      {/* Create / Edit Dialog */}
+      {/* Create / Edit Gold Adjustment Dialog */}
       {isDialogOpen && (
         <BoosterAdjustmentDialog
           isOpen={isDialogOpen}
@@ -393,6 +569,14 @@ export function BoosterBalanceTab({
         adjustments={adjustments}
         onConfirm={handleConfirmSettle}
         onClose={() => setIsSettleOpen(false)}
+      />
+
+      {/* Release Stored Cash Dialog */}
+      <BoosterVaultWithdrawDialog
+        isOpen={isWithdrawOpen}
+        booster={withdrawBoosterData}
+        onWithdraw={handleConfirmWithdraw}
+        onClose={() => setIsWithdrawOpen(false)}
       />
     </section>
   );

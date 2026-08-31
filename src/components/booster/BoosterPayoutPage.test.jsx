@@ -180,4 +180,54 @@ describe("BoosterPayoutPage - Personal Booster View", () => {
     const totalCurrentBalanceLabel = screen.getByText("Total current balance");
     expect(totalCurrentBalanceLabel.closest("div")).toHaveTextContent(money(0));
   });
+
+  it("renders Date and Booster Name inputs for admin, and hides them for normal boosters", () => {
+    const adminUser = { id: "admin-1", username: "AdminUser" };
+    const records = [
+      {
+        id: "r1",
+        discordId: "booster-123",
+        boosterName: "FrogH",
+        level: "+10",
+        quantity: 1,
+        totalBalance: 50,
+        paid: false
+      }
+    ];
+
+    // 1. Admin View
+    const { container, rerender } = render(
+      <BoosterPayoutPage
+        isAdmin={true}
+        user={adminUser}
+        records={records}
+        adjustments={[]}
+        prices={mockPrices}
+        permissions={{ canUseBooster: true, canMarkBoosterPaid: true }}
+      />
+    );
+
+    expect(container.querySelector('form.admin-booster-entry input[name="date"]')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Booster name")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Mythic\+ key/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Runs completed/i)).toBeInTheDocument();
+
+    // 2. Regular Booster View
+    const boosterUser = { id: "booster-123", username: "FrogH" };
+    rerender(
+      <BoosterPayoutPage
+        isAdmin={false}
+        user={boosterUser}
+        records={records}
+        adjustments={[]}
+        prices={mockPrices}
+        permissions={{ canUseBooster: true, canMarkBoosterPaid: false }}
+      />
+    );
+
+    expect(container.querySelector('form.booster-entry input[name="date"]')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Booster name")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Mythic\+ key/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Runs completed/i)).toBeInTheDocument();
+  });
 });

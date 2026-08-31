@@ -7,7 +7,7 @@ import { ProfitReportPage } from "./components/profit/ProfitReportPage.jsx";
 import { RateSettingsPage } from "./components/rates/RateSettingsPage.jsx";
 import { SupplierPaidHistoryPage } from "./components/supplier/SupplierPaidHistoryPage.jsx";
 import { SupplierUnpaidPage } from "./components/supplier/SupplierUnpaidPage.jsx";
-import { money } from "./utils/format.js";
+import { mmk, money } from "./utils/format.js";
 import { exportSupplierReport } from "./utils/exportSupplierReport.js";
 import { buildSupplierSummary, supplierBatchWarnings } from "./utils/supplierBatch.js";
 import { Badge } from "@/components/ui/badge.jsx";
@@ -36,7 +36,8 @@ const initialState = {
   supplierSummary: [],
   boosterRecords: [],
   boosterSummary: [],
-  boosterAdjustments: []
+  boosterAdjustments: [],
+  boosterCashVault: []
 };
 
 export function App() {
@@ -103,7 +104,7 @@ export function App() {
 
   const loadBoosters = useCallback(async (activePermissions = data.permissions) => {
     if (!activePermissions.boosterRecords) {
-      setData((current) => ({ ...current, boosterRecords: [], boosterSummary: [], boosterAdjustments: [] }));
+      setData((current) => ({ ...current, boosterRecords: [], boosterSummary: [], boosterAdjustments: [], boosterCashVault: [] }));
       return;
     }
     const payload = await api("/api/booster-records");
@@ -111,7 +112,8 @@ export function App() {
       ...current,
       boosterRecords: payload.records || [],
       boosterSummary: payload.summary || [],
-      boosterAdjustments: payload.adjustments || []
+      boosterAdjustments: payload.adjustments || [],
+      boosterCashVault: payload.vaultTransactions || []
     }));
   }, [data.permissions]);
 
@@ -158,7 +160,10 @@ export function App() {
             : config.permissions.boosterRecords ? current.boosterSummary : [],
           boosterAdjustments: boosterPayload
             ? (boosterPayload.adjustments || [])
-            : config.permissions.boosterRecords ? current.boosterAdjustments : []
+            : config.permissions.boosterRecords ? current.boosterAdjustments : [],
+          boosterCashVault: boosterPayload
+            ? (boosterPayload.vaultTransactions || [])
+            : config.permissions.boosterRecords ? current.boosterCashVault : []
         };
       });
       if (activeTab === "profit" && config.user?.role === "admin") {
@@ -178,7 +183,7 @@ export function App() {
       const config = await api("/api/config");
       const [supplierPayload, boosterPayload] = await Promise.all([
         config.permissions.supplierRecords ? api("/api/supplier-records") : Promise.resolve({ records: [], paidRecords: [], summary: [], withdrawals: [] }),
-        config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [] })
+        config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [], adjustments: [], vaultTransactions: [] })
       ]);
       setData((current) => ({
         ...current,
@@ -189,7 +194,8 @@ export function App() {
         supplierWithdrawals: supplierPayload.withdrawals || [],
         boosterRecords: boosterPayload.records || [],
         boosterSummary: boosterPayload.summary || [],
-        boosterAdjustments: boosterPayload.adjustments || []
+        boosterAdjustments: boosterPayload.adjustments || [],
+        boosterCashVault: boosterPayload.vaultTransactions || []
       }));
       setActiveTab(config.user?.role === "admin" ? "supplier" : "booster");
     } catch (error) {
@@ -259,6 +265,17 @@ export function App() {
     () => data.supplierRecords.filter((record) => record.correct && !record.paid),
     [data.supplierRecords]
   );
+
+  const tabBadges = useMemo(() => {
+    const unverifiedSupplierCount = data.supplierRecords.filter((r) => !r.correct && !r.paid).length;
+    const boosterReviewCount = data.boosterRecords.filter(
+      (r) => !r.paid && (!String(r.note || "").trim() || Number(r.totalBalance || 0) <= 0 || Number(r.quantity || 0) > 20)
+    ).length;
+    return {
+      supplier: unverifiedSupplierCount,
+      booster: boosterReviewCount
+    };
+  }, [data.supplierRecords, data.boosterRecords]);
 
   const supplierGrandTotal = useMemo(
     () => data.supplierSummary.reduce((sum, row) => sum + Number(row.totalCost || 0), 0),
@@ -526,12 +543,30 @@ export function App() {
       ...current,
       boosterRecords: payload.records || [],
       boosterSummary: payload.summary || [],
-      boosterAdjustments: payload.adjustments || current.boosterAdjustments
+      boosterAdjustments: payload.adjustments || current.boosterAdjustments,
+      boosterCashVault: payload.vaultTransactions || current.boosterCashVault
     }));
-    const message = payload.netPayoutAmount > 0
-      ? `Settlement complete. Paid ${money(payload.netPayoutAmount)} (${payload.settledCount} runs settled).`
-      : `Settlement complete. ${payload.settledCount} runs applied to offset debt.`;
+    let message = "";
+    if (payload.action === "hold_cash" && payload.cashAmountMmk > 0) {
+      message = `Settled ${payload.settledCount} runs. Stored ${mmk(payload.cashAmountMmk)} (${money(payload.netPayoutAmount)} gold @ ${payload.rate} MMK) in vault.`;
+    } else if (payload.netPayoutAmount > 0) {
+      message = `Settlement complete. Paid ${payload.rate > 0 ? mmk(payload.cashAmountMmk) : money(payload.netPayoutAmount)} (${payload.settledCount} runs settled).`;
+    } else {
+      message = `Settlement complete. ${payload.settledCount} runs applied to offset debt.`;
+    }
     showToast(message);
+  });
+
+  const withdrawBoosterVaultCash = (withdrawalData) => runAction(async () => {
+    const payload = await request("/api/booster-cash-vault/withdraw", {
+      method: "POST",
+      body: JSON.stringify(withdrawalData)
+    });
+    setData((current) => ({
+      ...current,
+      boosterCashVault: payload.vaultTransactions || current.boosterCashVault
+    }));
+    showToast(`Released ${mmk(withdrawalData.amount)} to ${withdrawalData.boosterName}.`);
   });
 
   const addBoosterAdjustment = (adjustmentData) => runAction(async () => {
@@ -809,7 +844,13 @@ export function App() {
         <section className="brand">
           <span className="brand-mark" aria-hidden="true" />
           <div className="brand-copy">
-            <p className="eyebrow">Moonlight WoW operations</p>
+            <div className="flex items-center gap-2">
+              <p className="eyebrow m-0">Moonlight WoW operations</p>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400/90 font-mono tracking-tight" title="Real-time 15s synchronization active">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-live-pulse" aria-hidden="true" />
+                Live
+              </span>
+            </div>
             <h1>Moonlight Ledger</h1>
             <p className="brand-subtitle">Supplier settlements, booster payouts, and margin clarity.</p>
           </div>
@@ -835,7 +876,7 @@ export function App() {
       </header>
 
       <div id="ledger-content" tabIndex={-1}>
-        <AppTabs activeTab={activeTab} isAdmin={isAdmin} onChange={setActiveTab} />
+        <AppTabs activeTab={activeTab} isAdmin={isAdmin} onChange={setActiveTab} badges={tabBadges} />
 
         {activeTab === "supplier" && (
           <SupplierUnpaidPage
@@ -886,6 +927,7 @@ export function App() {
             loadError={loadError}
             records={data.boosterRecords}
             adjustments={data.boosterAdjustments}
+            vaultTransactions={data.boosterCashVault}
             prices={data.boosterPrices}
             permissions={permissions}
             editing={editing}
@@ -896,6 +938,7 @@ export function App() {
             onSetEditing={setEditing}
             onMarkPaid={markBoosterPaid}
             onSettleBooster={settleBooster}
+            onWithdrawVaultCash={withdrawBoosterVaultCash}
             onAddAdjustment={addBoosterAdjustment}
             onUpdateAdjustment={updateBoosterAdjustment}
             onDeleteAdjustment={deleteBoosterAdjustment}

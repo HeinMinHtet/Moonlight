@@ -38,6 +38,9 @@ import {
   getBoosterAdjustmentById,
   updateBoosterAdjustment,
   deleteBoosterAdjustment,
+  getBoosterCashVaultPayload,
+  insertBoosterVaultTransaction,
+  withdrawBoosterVaultCash,
   updateSupplierServices,
   updateBoosterPrices,
   updateArmorTypes,
@@ -323,10 +326,10 @@ async function handleApi(req, res, url) {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view profit reporting.");
     const from = searchParams.get("from") || "";
     const to = searchParams.get("to") || "";
-    const groupBy = searchParams.get("groupBy") || "daily";
+    const groupBy = searchParams.get("groupBy") || "weekly";
     if (!validIsoDate(from) || !validIsoDate(to)) return sendJson(res, 400, { error: "Choose a valid profit report date range." });
     if (from > to) return sendJson(res, 400, { error: "Profit report start date must be before the end date." });
-    if (!["daily", "monthly"].includes(groupBy)) return sendJson(res, 400, { error: "Profit reports can be grouped daily or monthly." });
+    if (!["weekly", "monthly", "daily"].includes(groupBy)) return sendJson(res, 400, { error: "Profit reports can be grouped weekly or monthly." });
     const report = await getProfitReportData(from, to, groupBy);
     return sendJson(res, 200, report);
   }
@@ -596,7 +599,8 @@ async function handleApi(req, res, url) {
     if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view payout rows.");
     const payload = await getBoosterRecordsPayload(session, canManageAdmin(session));
     const { adjustments } = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, { ...payload, adjustments });
+    const { vaultTransactions } = await getBoosterCashVaultPayload(session, canManageAdmin(session));
+    return sendJson(res, 200, { ...payload, adjustments, vaultTransactions });
   }
 
   if (pathname === "/api/booster-records" && req.method === "POST") {
@@ -611,17 +615,44 @@ async function handleApi(req, res, url) {
     if (!prices.some((price) => price.active !== false && price.level === level)) return sendJson(res, 400, { error: "Choose an active Mythic+ key level." });
 
     const rateAtRecord = await getBoosterRate(level);
+    let boosterName = session.username;
+    let discordId = session.discordId;
+    let createdAt = new Date().toISOString();
+
+    if (canManageAdmin(session)) {
+      const customName = String(body.boosterName || "").trim();
+      if (customName) {
+        boosterName = customName;
+        if (customName !== session.username) {
+          const { records } = await getBoosterRecordsPayload(session, true);
+          const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+          const matched = records.find((r) => r.boosterName === customName && r.discordId && !r.discordId.startsWith("outsourced"))
+            || adjustments.find((a) => a.boosterName === customName && a.discordId && !a.discordId.startsWith("outsourced"));
+          discordId = matched?.discordId || (body.discordId ? String(body.discordId).trim() : `outsourced:${customName}`);
+        }
+      }
+      const rawDate = String(body.date || body.createdAt || "").trim();
+      if (rawDate) {
+        const isDateOnly = validIsoDate(rawDate);
+        const isParsable = !Number.isNaN(Date.parse(rawDate));
+        if (!isDateOnly && !isParsable) {
+          return sendJson(res, 400, { error: "Choose a valid payout date." });
+        }
+        createdAt = isDateOnly ? `${rawDate}T00:00:00.000Z` : new Date(rawDate).toISOString();
+      }
+    }
+
     const record = {
       id: randomBytes(10).toString("base64url"),
-      discordId: session.discordId,
-      boosterName: session.username,
+      discordId,
+      boosterName,
       level,
       quantity,
       note: String(body.note || "").trim(),
       paid: false,
       rateAtRecord,
       totalBalance: lineTotal(rateAtRecord, quantity),
-      createdAt: new Date().toISOString()
+      createdAt
     };
 
     await insertBoosterRecord(record);
@@ -657,23 +688,51 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const discordId = String(body.discordId || "").trim();
     const boosterName = String(body.boosterName || "").trim();
+    const rate = Number(body.rate) || 0;
+    const action = body.action === "hold_cash" ? "hold_cash" : "pay_now";
+    const date = String(body.date || "").trim();
+    const note = String(body.note || "").trim();
+
     if (!discordId && !boosterName) {
       return sendJson(res, 400, { error: "Booster name or ID is required for settlement." });
     }
 
-    const result = await settleBoosterBalance({ discordId, boosterName }, session);
+    const result = await settleBoosterBalance({ discordId, boosterName }, session, { rate, action, date, note });
     if (result.error) return sendJson(res, 400, { error: result.error });
 
     const { records, summary } = await getBoosterRecordsPayload(session, true);
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+    const { vaultTransactions } = await getBoosterCashVaultPayload(session, true);
     return sendJson(res, 200, {
       settledCount: result.settledCount,
       netPayoutAmount: result.netPayoutAmount,
+      rate: result.rate,
+      cashAmountMmk: result.cashAmountMmk,
+      action: result.action,
+      vaultTransaction: result.vaultTransaction,
       boosterPaymentBatchId: result.boosterPaymentBatchId,
       records,
       summary,
-      adjustments
+      adjustments,
+      vaultTransactions
     });
+  }
+
+  if (pathname === "/api/booster-cash-vault" && req.method === "GET") {
+    if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view vault records.");
+    const payload = await getBoosterCashVaultPayload(session, canManageAdmin(session));
+    return sendJson(res, 200, payload);
+  }
+
+  if (pathname === "/api/booster-cash-vault/withdraw" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can release stored cash to boosters.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const result = await withdrawBoosterVaultCash(body, session);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+
+    const { vaultTransactions } = await getBoosterCashVaultPayload(session, true);
+    return sendJson(res, 200, { ...result, vaultTransactions });
   }
 
   if (pathname.startsWith("/api/booster-records/") && req.method === "PATCH") {
@@ -693,6 +752,19 @@ async function handleApi(req, res, url) {
       updates.paidByDiscordId = paid ? session.discordId : null;
       updates.paidByName = paid ? session.username : null;
       updates.boosterPaymentBatchId = paid ? `bpb_${randomBytes(12).toString("base64url")}` : null;
+    }
+    if ("boosterName" in body) {
+      if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change the booster name.");
+      const newBoosterName = String(body.boosterName || "").trim();
+      if (!newBoosterName) return sendJson(res, 400, { error: "Booster name cannot be empty." });
+      updates.boosterName = newBoosterName;
+      if (newBoosterName !== record.boosterName) {
+        const { records } = await getBoosterRecordsPayload(session, true);
+        const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
+        const matched = records.find((r) => r.boosterName === newBoosterName && r.discordId && !r.discordId.startsWith("outsourced"))
+          || adjustments.find((a) => a.boosterName === newBoosterName && a.discordId && !a.discordId.startsWith("outsourced"));
+        updates.discordId = matched?.discordId || `outsourced:${newBoosterName}`;
+      }
     }
     if ("level" in body) {
       const level = String(body.level || "").trim();

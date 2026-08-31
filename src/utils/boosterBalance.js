@@ -92,7 +92,7 @@ export function calculateBoosterBalances(records = [], adjustments = []) {
   return result.sort((a, b) => b.currentBalance - a.currentBalance || a.boosterName.localeCompare(b.boosterName));
 }
 
-export function calculateBoosterSettlement(boosterSummary, openRecords = [], activeAdjustments = []) {
+export function calculateBoosterSettlement(boosterSummary, openRecords = [], activeAdjustments = [], rate = 0) {
   const openRunsTotal = openRecords.reduce((sum, r) => sum + Number(r.totalBalance || 0), 0);
   const addAdjustments = activeAdjustments.filter((a) => a.type === "add" && !a.settled);
   const deductAdjustments = activeAdjustments.filter((a) => a.type === "deduct" && !a.settled);
@@ -106,6 +106,8 @@ export function calculateBoosterSettlement(boosterSummary, openRecords = [], act
   const netPayoutAmount = Math.max(0, currentBalance);
   const debtOffsetAmount = isDeficit ? openRunsTotal : deductAdjustmentsTotal;
   const remainingDebt = isDeficit ? Math.abs(currentBalance) : 0;
+  const numericRate = Number(rate) || 0;
+  const cashAmountMmk = netPayoutAmount * numericRate;
 
   return {
     openRunsCount: openRecords.length,
@@ -119,8 +121,45 @@ export function calculateBoosterSettlement(boosterSummary, openRecords = [], act
     isDeficit,
     netPayoutAmount,
     debtOffsetAmount,
-    remainingDebt
+    remainingDebt,
+    rate: numericRate,
+    cashAmountMmk
   };
+}
+
+export function calculateBoosterVaultBalances(vaultTransactions = []) {
+  const vaultMap = new Map();
+
+  for (const tx of vaultTransactions) {
+    const key = tx.discordId || tx.boosterName || "unknown";
+    if (!vaultMap.has(key)) {
+      vaultMap.set(key, {
+        discordId: tx.discordId || "",
+        boosterName: tx.boosterName || "Unknown booster",
+        totalDeposited: 0,
+        totalWithdrawn: 0,
+        currentVaultBalance: 0,
+        transactionsCount: 0
+      });
+    }
+
+    const item = vaultMap.get(key);
+    const amount = Number(tx.amount || 0);
+    item.transactionsCount += 1;
+    if (tx.type === "deposit") {
+      item.totalDeposited += amount;
+    } else if (tx.type === "withdraw") {
+      item.totalWithdrawn += amount;
+    }
+  }
+
+  const result = [];
+  for (const item of vaultMap.values()) {
+    item.currentVaultBalance = item.totalDeposited - item.totalWithdrawn;
+    result.push(item);
+  }
+
+  return result.sort((a, b) => b.currentVaultBalance - a.currentVaultBalance || a.boosterName.localeCompare(b.boosterName));
 }
 
 export function validateAdjustmentPayload({ boosterName, type, amount, note, date }) {
@@ -136,6 +175,25 @@ export function validateAdjustmentPayload({ boosterName, type, amount, note, dat
   }
   if (!note || !String(note).trim()) {
     throw new Error("Reason / note is required for balance adjustments.");
+  }
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error("Date must be in YYYY-MM-DD format.");
+  }
+}
+
+export function validateVaultWithdrawalPayload({ boosterName, amount, currentVaultBalance, note, date }) {
+  if (!boosterName || !String(boosterName).trim()) {
+    throw new Error("Booster name is required.");
+  }
+  const numericAmount = Number(amount);
+  if (isNaN(numericAmount) || numericAmount <= 0) {
+    throw new Error("Withdrawal amount must be a positive number greater than 0.");
+  }
+  if (currentVaultBalance !== undefined && numericAmount > Number(currentVaultBalance || 0)) {
+    throw new Error("Withdrawal amount cannot exceed the stored cash vault balance.");
+  }
+  if (!note || !String(note).trim()) {
+    throw new Error("Payment note or channel reference is required.");
   }
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new Error("Date must be in YYYY-MM-DD format.");

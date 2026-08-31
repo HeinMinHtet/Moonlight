@@ -15,7 +15,16 @@ const db = {
   ]
 };
 
-test("daily profit uses paid timestamps and excludes unpaid records", () => {
+test("weekly profit groups paid rows by their week starting Monday", () => {
+  const report = buildProfitReport(db, "2026-07-25", "2026-08-10", "weekly");
+  assert.equal(report.rows.length, 1);
+  assert.equal(report.rows[0].period, "2026-07-27");
+  assert.equal(report.totals.supplierPaidTotal, 800);
+  assert.equal(report.totals.boosterPayoutTotal, 200);
+  assert.equal(report.totals.netProfit, 600);
+});
+
+test("daily profit fallback uses paid timestamps and excludes unpaid records", () => {
   const report = buildProfitReport(db, "2026-08-01", "2026-08-01", "daily");
   assert.deepEqual(report.totals, {
     supplierPaidTotal: 500,

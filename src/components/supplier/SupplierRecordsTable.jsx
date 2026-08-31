@@ -188,7 +188,7 @@ export function SupplierRecordsTable({
           </div>
         );
       },
-      meta: { headClassName: "w-40 text-center", cellClassName: actionCell }
+      meta: { headClassName: "w-40 text-center table-sticky-actions-head", cellClassName: "text-center table-sticky-actions" }
     }
   ], []);
 

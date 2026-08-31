@@ -48,6 +48,7 @@ export function BoosterRecordsTable({
     if (!record) return;
     setDraft({
       createdAt: String(record.createdAt || "").slice(0, 10),
+      boosterName: record.boosterName || "",
       level: record.level || "",
       quantity: record.quantity ?? 1,
       rateAtRecord: record.rateAtRecord ?? 0,
@@ -91,6 +92,18 @@ export function BoosterRecordsTable({
     ...(isAdmin ? [{
       accessorKey: "boosterName",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Booster" className={centeredHeader} />,
+      cell: ({ row, getValue, table }) => {
+        const { draft, setDraft, editing, isAdmin: isTableAdmin } = table.options.meta;
+        return isEditing(row.original, editing) && isTableAdmin ? (
+          <Input
+            className="table-edit-field mx-auto w-36 text-center"
+            value={draft.boosterName || ""}
+            onChange={(event) => setDraft((current) => ({ ...current, boosterName: event.target.value }))}
+          />
+        ) : (
+          getValue()
+        );
+      },
       meta: { label: "Booster", headClassName: centeredCell, cellClassName: centeredCell }
     }] : []),
     {
@@ -172,7 +185,7 @@ export function BoosterRecordsTable({
         if (isEditing(row.original, editing)) {
           return (
             <div className="flex justify-center gap-2">
-              <Button size="sm" onClick={() => patchFn(row.original.id, isTableAdmin ? draft : withoutKey(draft, "rateAtRecord"))}>Save changes</Button>
+              <Button size="sm" onClick={() => patchFn(row.original.id, isTableAdmin ? draft : withoutKey(withoutKey(draft, "rateAtRecord"), "boosterName"))}>Save changes</Button>
               <Button variant="outline" size="sm" onClick={() => setEditFn(null)}>Cancel</Button>
             </div>
           );
@@ -184,7 +197,7 @@ export function BoosterRecordsTable({
           </div>
         );
       },
-      meta: { headClassName: "w-44 text-center", cellClassName: actionCell }
+      meta: { headClassName: "w-44 text-center table-sticky-actions-head", cellClassName: "text-center table-sticky-actions" }
     }
   ], [isAdmin]);
 

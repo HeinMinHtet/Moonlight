@@ -10,7 +10,7 @@ const tabs = [
   { id: "prices", label: "Default rates", icon: SlidersHorizontal, adminOnly: true }
 ];
 
-export function AppTabs({ activeTab, isAdmin, onChange }) {
+export function AppTabs({ activeTab, isAdmin, onChange, badges = {} }) {
   const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   return (
@@ -18,10 +18,16 @@ export function AppTabs({ activeTab, isAdmin, onChange }) {
       <TabsList className="ledger-navigation-list" aria-label="Workspace views">
         {visibleTabs.map((tab) => {
           const Icon = tab.icon;
+          const badgeCount = badges[tab.id];
           return (
             <TabsTrigger key={tab.id} value={tab.id} className="ledger-navigation-item">
               <Icon className="size-4" aria-hidden="true" />
               <span>{tab.label}</span>
+              {badgeCount > 0 && (
+                <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30 font-mono">
+                  {badgeCount}
+                </span>
+              )}
             </TabsTrigger>
           );
         })}
