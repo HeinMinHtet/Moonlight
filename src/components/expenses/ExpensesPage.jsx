@@ -146,7 +146,7 @@ export function ExpensesPage({
               />
             </Label>
             <Label className="filter-select">
-              Filter Category
+              Category
               <NativeSelect
                 value={filters.category}
                 onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}
@@ -158,7 +158,7 @@ export function ExpensesPage({
               </NativeSelect>
             </Label>
             <Label className="filter-date">
-              From date
+              From
               <Input
                 type="date"
                 value={filters.dateFrom}
@@ -166,7 +166,7 @@ export function ExpensesPage({
               />
             </Label>
             <Label className="filter-date">
-              To date
+              To
               <Input
                 type="date"
                 value={filters.dateTo}

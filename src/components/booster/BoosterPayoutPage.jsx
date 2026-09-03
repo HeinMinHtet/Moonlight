@@ -409,7 +409,7 @@ export function BoosterPayoutPage({
                   {/* Payout Filters */}
                   <section className="filter-bar booster-filter-bar" aria-label="Booster payout filters">
                     {isAdmin && (
-                      <Label>
+                      <Label className="filter-select">
                         Booster
                         <NativeSelect
                           value={filters.booster}
@@ -424,7 +424,7 @@ export function BoosterPayoutPage({
                         </NativeSelect>
                       </Label>
                     )}
-                    <Label>
+                    <Label className="filter-select">
                       Key level
                       <NativeSelect
                         value={filters.level}
@@ -438,7 +438,7 @@ export function BoosterPayoutPage({
                         ))}
                       </NativeSelect>
                     </Label>
-                    <Label>
+                    <Label className="filter-date">
                       From
                       <Input
                         type="date"
@@ -446,7 +446,7 @@ export function BoosterPayoutPage({
                         onChange={(event) => updateFilter("dateFrom", event.target.value)}
                       />
                     </Label>
-                    <Label>
+                    <Label className="filter-date">
                       To
                       <Input
                         type="date"
@@ -455,6 +455,7 @@ export function BoosterPayoutPage({
                       />
                     </Label>
                     <Button
+                      className="filter-action"
                       variant="outline"
                       type="button"
                       onClick={() => {

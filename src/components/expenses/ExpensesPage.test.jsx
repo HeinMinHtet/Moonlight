@@ -89,18 +89,19 @@ describe("ExpensesPage", () => {
     expect(screen.getByText("Outsource Key 16")).toBeInTheDocument();
 
     // Filter by Raid category
-    const categorySelect = screen.getByRole("combobox", { name: "Filter Category" });
+    const filterRegion = screen.getByRole("region", { name: "External expense filters" });
+    const categorySelect = within(filterRegion).getByRole("combobox", { name: /^Category$/i });
     await user.selectOptions(categorySelect, "raid");
 
     expect(screen.getByText("Heroic Raid Team 1")).toBeInTheDocument();
     expect(screen.queryByText("Outsource Key 16")).not.toBeInTheDocument();
 
     // Clear filters
-    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await user.click(within(filterRegion).getByRole("button", { name: "Clear filters" }));
     expect(screen.getByText("Outsource Key 16")).toBeInTheDocument();
 
     // Filter by search query
-    const searchInput = screen.getByPlaceholderText("Description, recipient, or note...");
+    const searchInput = within(filterRegion).getByPlaceholderText("Description, recipient, or note...");
     await user.type(searchInput, "Outsource");
 
     expect(screen.queryByText("Heroic Raid Team 1")).not.toBeInTheDocument();

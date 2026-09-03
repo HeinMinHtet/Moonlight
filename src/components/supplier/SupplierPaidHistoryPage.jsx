@@ -52,6 +52,16 @@ export function SupplierPaidHistoryPage({
 
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
 
+  const isFiltered = Boolean(
+    filters.buyer ||
+    filters.service !== "all" ||
+    filters.paidBy !== "all" ||
+    filters.paidFrom ||
+    filters.paidTo ||
+    filters.saleFrom ||
+    filters.saleTo
+  );
+
   if (!isAdmin) return <AccessDenied />;
 
   return (
@@ -73,34 +83,54 @@ export function SupplierPaidHistoryPage({
         </section>
 
         <section className="filter-bar history-filter-bar" aria-label="Paid supplier history filters">
-          <Label>
+          <Label className="filter-search">
             Buyer
             <Input
               type="search"
-              placeholder="Search character"
+              placeholder="Search buyer..."
               value={filters.buyer}
               onChange={(event) => updateFilter("buyer", event.target.value)}
             />
           </Label>
-          <Label>
+          <Label className="filter-select">
             Service
             <NativeSelect value={filters.service} onChange={(event) => updateFilter("service", event.target.value)}>
               <option value="all">All services</option>
               {serviceOptions.map((service) => <option key={service} value={service}>{service}</option>)}
             </NativeSelect>
           </Label>
-          <Label>
+          <Label className="filter-select">
             Paid by
             <NativeSelect value={filters.paidBy} onChange={(event) => updateFilter("paidBy", event.target.value)}>
               <option value="all">All admins</option>
               {paidByOptions.map((name) => <option key={name} value={name}>{name}</option>)}
             </NativeSelect>
           </Label>
-          <Label>Paid from<Input type="date" value={filters.paidFrom} onChange={(event) => updateFilter("paidFrom", event.target.value)} /></Label>
-          <Label>Paid to<Input type="date" value={filters.paidTo} onChange={(event) => updateFilter("paidTo", event.target.value)} /></Label>
-          <Label>Sale from<Input type="date" value={filters.saleFrom} onChange={(event) => updateFilter("saleFrom", event.target.value)} /></Label>
-          <Label>Sale to<Input type="date" value={filters.saleTo} onChange={(event) => updateFilter("saleTo", event.target.value)} /></Label>
-          <Button variant="outline" type="button" onClick={() => setFilters(filterDefaults)}>Clear filters</Button>
+          <Label className="filter-date">
+            Paid from
+            <Input type="date" value={filters.paidFrom} onChange={(event) => updateFilter("paidFrom", event.target.value)} />
+          </Label>
+          <Label className="filter-date">
+            Paid to
+            <Input type="date" value={filters.paidTo} onChange={(event) => updateFilter("paidTo", event.target.value)} />
+          </Label>
+          <Label className="filter-date">
+            Sale from
+            <Input type="date" value={filters.saleFrom} onChange={(event) => updateFilter("saleFrom", event.target.value)} />
+          </Label>
+          <Label className="filter-date">
+            Sale to
+            <Input type="date" value={filters.saleTo} onChange={(event) => updateFilter("saleTo", event.target.value)} />
+          </Label>
+          <Button
+            className="filter-action"
+            variant="outline"
+            type="button"
+            onClick={() => setFilters(filterDefaults)}
+            disabled={!isFiltered}
+          >
+            Clear filters
+          </Button>
         </section>
 
         {loading && <div className="space-y-2 p-4" aria-label="Loading paid supplier history"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>}
