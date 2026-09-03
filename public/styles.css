@@ -582,14 +582,14 @@ select option {
 
 .filter-bar input,
 .filter-bar select {
-  height: 42px;
-  min-height: 42px;
+  height: 44px;
+  min-height: 44px;
   font-size: 13.5px;
   font-weight: 500;
 }
 
 .filter-bar .ghost {
-  min-height: 42px;
+  min-height: 44px;
 }
 
 .filter-bar .filter-search {
@@ -603,8 +603,8 @@ select option {
 }
 
 .filter-bar .filter-date {
-  flex: 1 1 135px;
-  min-width: 125px;
+  flex: 1 1 160px;
+  min-width: 155px;
 }
 
 .filter-bar .filter-date input[type="date"] {
@@ -615,8 +615,8 @@ select option {
 .filter-bar .filter-action {
   align-self: flex-end;
   flex: 0 0 auto;
-  height: 42px;
-  min-height: 42px;
+  height: 44px;
+  min-height: 44px;
   white-space: nowrap;
 }
 
@@ -660,8 +660,8 @@ select option {
 }
 
 .supplier-filter-bar .filter-date {
-  flex: 1 1 130px;
-  min-width: 120px;
+  flex: 1 1 160px;
+  min-width: 155px;
 }
 
 .expense-filter-bar {
@@ -672,18 +672,26 @@ select option {
 }
 
 .expense-filter-bar .filter-search {
-  flex: 2 1 200px;
-  min-width: 150px;
+  flex: 2 1 240px;
+  min-width: 180px;
 }
 
 .expense-filter-bar .filter-select {
-  flex: 1.2 1 150px;
-  min-width: 130px;
+  flex: 1.2 1 165px;
+  min-width: 155px;
 }
 
 .expense-filter-bar .filter-date {
-  flex: 1 1 135px;
-  min-width: 125px;
+  flex: 1 1 160px;
+  min-width: 155px;
+}
+
+.expense-filter-bar .filter-action {
+  align-self: flex-end;
+  flex: 0 0 auto;
+  height: 44px;
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .booster-filter-bar {
@@ -699,8 +707,8 @@ select option {
 }
 
 .booster-filter-bar .filter-date {
-  flex: 1 1 135px;
-  min-width: 125px;
+  flex: 1 1 160px;
+  min-width: 155px;
 }
 
 .history-batch-list {
@@ -795,34 +803,39 @@ select option {
 
 .entry-grid {
   display: grid;
-  grid-template-columns: 140px minmax(160px, 1fr) 150px 90px 130px minmax(140px, 1fr) 150px;
-  gap: 10px;
+  grid-template-columns: minmax(155px, 1.1fr) minmax(160px, 1.2fr) minmax(150px, 1fr) 90px minmax(130px, 1fr) minmax(140px, 1fr) auto;
+  gap: 12px;
   padding: 14px 16px;
+  align-items: end;
 }
 
 .entry-grid label {
   display: grid;
   gap: 5px;
+  min-width: 0;
 }
 
 .expense-entry-grid {
   display: grid;
-  grid-template-columns: 140px 170px minmax(180px, 1.4fr) 120px 160px minmax(140px, 1fr) 150px;
-  gap: 10px;
+  grid-template-columns: minmax(155px, 1.1fr) minmax(175px, 1.2fr) minmax(200px, 2fr) minmax(130px, 1fr) minmax(170px, 1.3fr) minmax(150px, 1.2fr) auto;
+  gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
+  align-items: end;
 }
 
 .expense-entry-grid label {
   display: grid;
   gap: 5px;
+  min-width: 0;
 }
 
 .record-action {
   align-self: end;
   height: 44px;
+  min-height: 44px;
   justify-self: stretch;
-  min-width: 128px;
+  min-width: 140px;
   white-space: nowrap;
 }
 
@@ -1338,6 +1351,12 @@ td .table-edit[type="number"] {
   display: none !important;
 }
 
+@media (max-width: 1280px) and (min-width: 901px) {
+  .expense-entry-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  }
+}
+
 @media (max-width: 1100px) {
   .access-grid,
   .sheet-layout,
@@ -1347,7 +1366,6 @@ td .table-edit[type="number"] {
   }
 
   .entry-grid,
-  .expense-entry-grid,
   .batch-bar,
   .booster-entry {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1358,6 +1376,34 @@ td .table-edit[type="number"] {
   .profit-stat-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
   .history-batch-actions { justify-content: flex-start; }
+}
+
+@media (max-width: 900px) {
+  .entry-grid,
+  .expense-entry-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expense-entry-grid .record-action,
+  .entry-grid .record-action {
+    grid-column: 1 / -1;
+  }
+
+  .expense-filter-bar .filter-search {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .expense-filter-bar .filter-select,
+  .expense-filter-bar .filter-date {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 140px;
+  }
+
+  .expense-filter-bar .filter-action {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 
 @media (max-width: 640px) {
