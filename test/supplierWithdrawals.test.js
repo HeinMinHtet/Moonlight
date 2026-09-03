@@ -275,3 +275,75 @@ test("markSupplierRecordsPaid with settleWithdrawals true vs false", async () =>
   await deleteSupplierWithdrawal(withdrawal.id);
 });
 
+test("markSupplierRecordsPaid partial withdrawal offset splits non-destructively and reopens without loss", async () => {
+  const {
+    insertSupplierRecord,
+    deleteSupplierRecord,
+    insertSupplierWithdrawal,
+    getSupplierWithdrawalById,
+    getSupplierWithdrawalsPayload,
+    deleteSupplierWithdrawal,
+    markSupplierRecordsPaid,
+    reopenSupplierPaymentBatch
+  } = await import("../lib/db.js");
+
+  const session = { discordId: "admin-1", username: "AdminUser" };
+
+  // 1. Create a 1000 gold withdrawal
+  const withdrawal = await insertSupplierWithdrawal({
+    charName: "PartialBanker",
+    guild: "Test Guild",
+    amount: 1000,
+    date: "2026-08-28",
+    note: "Initial withdrawal"
+  });
+
+  // 2. Create a 600 gold sale
+  const sale = {
+    id: "test-rec-partial-1",
+    date: "2026-08-28",
+    buyerName: "BuyerPartial",
+    serviceType: "M+ 10",
+    quantity: 1,
+    armorType: "No stack",
+    correct: true,
+    paid: false,
+    rateAtRecord: 600,
+    totalCost: 600,
+    createdAt: new Date().toISOString()
+  };
+  await insertSupplierRecord(sale);
+
+  // 3. Mark sale paid with settleWithdrawals: true (600 sales vs 1000 withdrawal)
+  const markRes = await markSupplierRecordsPaid(new Set([sale.id]), session, { settleWithdrawals: true });
+  assert.equal(markRes.paidCount, 1);
+  const batchId = markRes.paymentBatchId;
+
+  // Check that the original withdrawal has been settled for 600 with the batch ID
+  const wOriginal = await getSupplierWithdrawalById(withdrawal.id);
+  assert.equal(wOriginal.settled, true);
+  assert.equal(wOriginal.amount, 600);
+  assert.equal(wOriginal.settlementBatchId, batchId);
+
+  // Check that a remainder withdrawal for 400 was created
+  const payload = await getSupplierWithdrawalsPayload();
+  const remainder = payload.withdrawals.find((w) => !w.settled && w.charName === "PartialBanker");
+  assert.ok(remainder);
+  assert.equal(remainder.amount, 400);
+
+  // 4. Reopen the batch
+  const reopenRes = await reopenSupplierPaymentBatch(batchId, session);
+  assert.equal(reopenRes.reopenedCount, 1);
+
+  // Check that the original 600 portion is now unsettled
+  const wReopened = await getSupplierWithdrawalById(withdrawal.id);
+  assert.equal(wReopened.settled, false);
+  assert.equal(wReopened.settlementBatchId, null);
+
+  // Cleanup
+  await deleteSupplierRecord(sale.id);
+  await deleteSupplierWithdrawal(withdrawal.id);
+  if (remainder) await deleteSupplierWithdrawal(remainder.id);
+});
+
+

@@ -171,3 +171,20 @@ test("calculateBoosterSettlement handles positive balance and deficit settlement
   assert.equal(res2.remainingDebt, 60);
 });
 
+test("calculateBoosterBalances unifies outsourced booster runs and named adjustments under one account without splitting", () => {
+  const records = [
+    { id: "r1", discordId: "outsourced:PugTank", boosterName: "PugTank", totalBalance: 120, paid: false }
+  ];
+  const adjustments = [
+    { id: "a1", discordId: "PugTank", boosterName: "PugTank", type: "deduct", amount: 20, settled: false }
+  ];
+
+  const balances = calculateBoosterBalances(records, adjustments);
+  assert.equal(balances.length, 1);
+  assert.equal(balances[0].boosterName, "PugTank");
+  assert.equal(balances[0].openRunsTotal, 120);
+  assert.equal(balances[0].deductAdjustmentsTotal, 20);
+  assert.equal(balances[0].currentBalance, 100);
+});
+
+

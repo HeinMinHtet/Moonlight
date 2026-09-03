@@ -217,7 +217,7 @@ export function BoosterBalanceTab({
                 <th className="px-4 py-3 text-right">Net Adjustments</th>
                 <th className="px-4 py-3 text-right">Run Balance</th>
                 <th className="px-4 py-3 text-right">Stored Cash (MMK)</th>
-                <th className="px-4 py-3 text-right">Lifetime Gold Paid</th>
+                <th className="px-4 py-3 text-right" title="Cumulative total paid out for completed runs">Paid Runs Total</th>
                 <th className="px-4 py-3 text-right pr-4">Actions</th>
               </tr>
             </thead>

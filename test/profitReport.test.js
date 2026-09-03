@@ -61,6 +61,49 @@ test("monthly profit groups every paid row and expense in the selected month", (
   assert.equal(report.totals.netProfit, 400);
 });
 
+test("profit report includes settled booster bonuses and penalty deductions", () => {
+  const dbWithAdjs = {
+    supplierRecords: [
+      { paid: true, paidAt: "2026-08-05T10:00:00.000Z", date: "2026-08-05", totalCost: 1000 }
+    ],
+    boosterRecords: [
+      { paid: true, paidAt: "2026-08-05T10:00:00.000Z", createdAt: "2026-08-05", totalBalance: 400 }
+    ],
+    boosterAdjustments: [
+      { settled: true, settledAt: "2026-08-05T10:00:00.000Z", type: "add", amount: 50 },
+      { settled: true, settledAt: "2026-08-05T10:00:00.000Z", type: "deduct", amount: 20 },
+      { settled: false, settledAt: null, type: "add", amount: 100 } // Unsettled should be ignored
+    ],
+    externalExpenses: []
+  };
+
+  const report = buildProfitReport(dbWithAdjs, "2026-08-05", "2026-08-05", "daily");
+  assert.equal(report.totals.supplierPaidTotal, 1000);
+  // boosterPayoutTotal = 400 (runs) + 50 (bonus) - 20 (penalty) = 430
+  assert.equal(report.totals.boosterPayoutTotal, 430);
+  // netProfit = 1000 - 430 = 570
+  assert.equal(report.totals.netProfit, 570);
+});
+
+test("profit report respects Thailand timezone for late-night UTC timestamps", () => {
+  const dbTz = {
+    supplierRecords: [
+      // 18:30 UTC on Aug 31 is 01:30 AM on Sept 1 in Bangkok (UTC+7)
+      { paid: true, paidAt: "2026-08-31T18:30:00.000Z", date: "2026-08-31", totalCost: 600 }
+    ],
+    boosterRecords: [],
+    externalExpenses: [
+      { id: "e1", date: "2026-09-01", category: "Raid", amount: 100 }
+    ]
+  };
+
+  const reportSept = buildProfitReport(dbTz, "2026-09-01", "2026-09-01", "daily");
+  assert.equal(reportSept.totals.supplierPaidTotal, 600);
+  assert.equal(reportSept.totals.externalExpenseTotal, 100);
+  assert.equal(reportSept.totals.netProfit, 500);
+  assert.equal(reportSept.rows[0].period, "2026-09-01");
+});
+
 test("date validation rejects impossible calendar dates", () => {
   assert.equal(validIsoDate("2026-08-17"), true);
   assert.equal(validIsoDate("2026-02-30"), false);

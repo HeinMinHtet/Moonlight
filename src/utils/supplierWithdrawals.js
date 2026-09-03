@@ -19,8 +19,14 @@
  *   isDeficit: boolean
  * }}
  */
+export function round2(value) {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
 export function calculateSupplierNetBalance(verifiedSalesTotal = 0, withdrawals = []) {
-  const safeSalesTotal = Math.max(0, Number(verifiedSalesTotal) || 0);
+  const safeSalesTotal = round2(Math.max(0, Number(verifiedSalesTotal) || 0));
 
   let activeWithdrawalsTotal = 0;
   let settledWithdrawalsTotal = 0;
@@ -31,14 +37,14 @@ export function calculateSupplierNetBalance(verifiedSalesTotal = 0, withdrawals 
     if (!Number.isFinite(amount) || amount <= 0) continue;
 
     if (w.settled) {
-      settledWithdrawalsTotal += amount;
+      settledWithdrawalsTotal = round2(settledWithdrawalsTotal + amount);
     } else {
-      activeWithdrawalsTotal += amount;
+      activeWithdrawalsTotal = round2(activeWithdrawalsTotal + amount);
       activeWithdrawalsCount += 1;
     }
   }
 
-  const netBalance = safeSalesTotal - activeWithdrawalsTotal;
+  const netBalance = round2(safeSalesTotal - activeWithdrawalsTotal);
   const isDeficit = netBalance < 0;
 
   return {
@@ -136,9 +142,9 @@ export function reconcileWithdrawalSettlement(verifiedSalesTotal = 0, activeWith
       });
     } else {
       // Partial offset
-      const offset = remainingSales;
-      const remainingAmount = amount - offset;
-      totalOffset += offset;
+      const offset = round2(remainingSales);
+      const remainingAmount = round2(amount - offset);
+      totalOffset = round2(totalOffset + offset);
       remainingSales = 0;
 
       partiallySettledWithdrawal = {
@@ -152,15 +158,17 @@ export function reconcileWithdrawalSettlement(verifiedSalesTotal = 0, activeWith
     }
   }
 
-  const remainingDebt = unsettledWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0) +
-    (partiallySettledWithdrawal ? Number(partiallySettledWithdrawal.remainingAmount || 0) : 0);
+  const remainingDebt = round2(
+    unsettledWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0) +
+    (partiallySettledWithdrawal ? Number(partiallySettledWithdrawal.remainingAmount || 0) : 0)
+  );
 
   return {
     settledWithdrawals,
     partiallySettledWithdrawal,
     unsettledWithdrawals,
-    totalOffset,
-    remainingSales,
+    totalOffset: round2(totalOffset),
+    remainingSales: round2(remainingSales),
     remainingDebt
   };
 }

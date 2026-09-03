@@ -75,11 +75,10 @@ export function SupplierExportDialog({
   const dateRangeWithdrawals = useMemo(() => {
     return activeWithdrawals.filter((w) => {
       const wDate = String(w.date || "").slice(0, 10);
-      if (dateFrom && wDate < dateFrom) return false;
       if (dateTo && wDate > dateTo) return false;
       return true;
     });
-  }, [activeWithdrawals, dateFrom, dateTo]);
+  }, [activeWithdrawals, dateTo]);
 
   const dateRangeWithdrawalsTotal = useMemo(
     () => dateRangeWithdrawals.reduce((sum, w) => sum + Number(w.amount || 0), 0),
