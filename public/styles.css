@@ -611,6 +611,53 @@ select {
   white-space: nowrap;
 }
 
+.expense-filter-bar {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.expense-filter-bar label {
+  color: var(--legacy-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 5px;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.expense-filter-bar .filter-search {
+  flex: 1.8 1 200px;
+  min-width: 150px;
+}
+
+.expense-filter-bar .filter-select {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+
+.expense-filter-bar .filter-date {
+  flex: 1 1 130px;
+  min-width: 120px;
+}
+
+.expense-filter-bar .filter-date input[type="date"] {
+  min-width: 0;
+  width: 100%;
+}
+
+.expense-filter-bar .filter-action {
+  align-self: flex-end;
+  flex: 0 0 auto;
+  height: 44px;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
 .history-batch-list {
   display: grid;
   gap: 12px;
@@ -709,6 +756,19 @@ select {
 }
 
 .entry-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.expense-entry-grid {
+  display: grid;
+  grid-template-columns: 140px 170px minmax(180px, 1.4fr) 120px 160px minmax(140px, 1fr) 150px;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.expense-entry-grid label {
   display: grid;
   gap: 5px;
 }
@@ -1246,6 +1306,7 @@ td .table-edit[type="number"] {
   }
 
   .entry-grid,
+  .expense-entry-grid,
   .filter-bar,
   .batch-bar,
   .booster-entry {
@@ -1304,6 +1365,7 @@ td .table-edit[type="number"] {
   .inline-control,
   .access-panel,
   .entry-grid,
+  .expense-entry-grid,
   .filter-bar,
   .batch-bar,
   .booster-entry {

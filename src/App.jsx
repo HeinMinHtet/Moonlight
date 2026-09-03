@@ -3,6 +3,8 @@ import { api } from "./api.js";
 import { AppTabs } from "./components/AppTabs.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { BoosterPayoutPage } from "./components/booster/BoosterPayoutPage.jsx";
+import { PriceCalculatorPage } from "./components/calculator/PriceCalculatorPage.jsx";
+import { ExpensesPage } from "./components/expenses/ExpensesPage.jsx";
 import { ProfitReportPage } from "./components/profit/ProfitReportPage.jsx";
 import { RateSettingsPage } from "./components/rates/RateSettingsPage.jsx";
 import { SupplierPaidHistoryPage } from "./components/supplier/SupplierPaidHistoryPage.jsx";
@@ -37,7 +39,8 @@ const initialState = {
   boosterRecords: [],
   boosterSummary: [],
   boosterAdjustments: [],
-  boosterCashVault: []
+  boosterCashVault: [],
+  externalExpenses: []
 };
 
 export function App() {
@@ -50,6 +53,7 @@ export function App() {
   const [supplierFormKey, setSupplierFormKey] = useState(0);
   const [withdrawalFormKey, setWithdrawalFormKey] = useState(0);
   const [boosterFormKey, setBoosterFormKey] = useState(0);
+  const [expenseFormKey, setExpenseFormKey] = useState(0);
   const [profitRefreshVersion, setProfitRefreshVersion] = useState(0);
   const confirmResolver = useRef(null);
   const pollingRef = useRef(false);
@@ -61,6 +65,7 @@ export function App() {
   const permissions = {
     canUseSupplier: Boolean(data.permissions.supplierRecords),
     canUseBooster: Boolean(data.permissions.boosterRecords),
+    canUseExpenses: Boolean(data.permissions.externalExpenses),
     canEditSupplierStatus: Boolean(data.permissions.supplierStatus),
     canMarkSupplierPaid: Boolean(data.permissions.supplierPaid),
     canReopenSupplierPaid: Boolean(data.permissions.supplierPaid),
@@ -117,17 +122,31 @@ export function App() {
     }));
   }, [data.permissions]);
 
+  const loadExpenses = useCallback(async (activePermissions = data.permissions) => {
+    if (!activePermissions.externalExpenses) {
+      setData((current) => ({ ...current, externalExpenses: [] }));
+      return;
+    }
+    const payload = await api("/api/external-expenses");
+    setData((current) => ({
+      ...current,
+      externalExpenses: payload.expenses || []
+    }));
+  }, [data.permissions]);
+
   const pollVisibleData = useCallback(async () => {
     if (pollingRef.current || foregroundActionRef.current) return;
     pollingRef.current = true;
     const startedAtVersion = dataVersionRef.current;
     try {
       const config = await api("/api/config");
-      const needsSupplier = config.permissions.supplierRecords && ["supplier", "supplierHistory", "prices"].includes(activeTab);
+      const needsSupplier = config.permissions.supplierRecords && ["supplier", "supplierHistory", "prices", "calculator"].includes(activeTab);
       const needsBoosters = config.permissions.boosterRecords && ["booster", "prices"].includes(activeTab);
-      const [supplierPayload, boosterPayload] = await Promise.all([
+      const needsExpenses = config.permissions.externalExpenses && ["expenses", "profit"].includes(activeTab);
+      const [supplierPayload, boosterPayload, expensesPayload] = await Promise.all([
         needsSupplier ? api("/api/supplier-records") : Promise.resolve(null),
-        needsBoosters ? api("/api/booster-records") : Promise.resolve(null)
+        needsBoosters ? api("/api/booster-records") : Promise.resolve(null),
+        needsExpenses ? api("/api/external-expenses") : Promise.resolve(null)
       ]);
 
       if (foregroundActionRef.current || dataVersionRef.current !== startedAtVersion) return;
@@ -163,7 +182,10 @@ export function App() {
             : config.permissions.boosterRecords ? current.boosterAdjustments : [],
           boosterCashVault: boosterPayload
             ? (boosterPayload.vaultTransactions || [])
-            : config.permissions.boosterRecords ? current.boosterCashVault : []
+            : config.permissions.boosterRecords ? current.boosterCashVault : [],
+          externalExpenses: expensesPayload
+            ? (expensesPayload.expenses || [])
+            : config.permissions.externalExpenses ? current.externalExpenses : []
         };
       });
       if (activeTab === "profit" && config.user?.role === "admin") {
@@ -181,9 +203,10 @@ export function App() {
     setLoadError("");
     try {
       const config = await api("/api/config");
-      const [supplierPayload, boosterPayload] = await Promise.all([
+      const [supplierPayload, boosterPayload, expensesPayload] = await Promise.all([
         config.permissions.supplierRecords ? api("/api/supplier-records") : Promise.resolve({ records: [], paidRecords: [], summary: [], withdrawals: [] }),
-        config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [], adjustments: [], vaultTransactions: [] })
+        config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [], adjustments: [], vaultTransactions: [] }),
+        config.permissions.externalExpenses ? api("/api/external-expenses") : Promise.resolve({ expenses: [] })
       ]);
       setData((current) => ({
         ...current,
@@ -195,7 +218,8 @@ export function App() {
         boosterRecords: boosterPayload.records || [],
         boosterSummary: boosterPayload.summary || [],
         boosterAdjustments: boosterPayload.adjustments || [],
-        boosterCashVault: boosterPayload.vaultTransactions || []
+        boosterCashVault: boosterPayload.vaultTransactions || [],
+        externalExpenses: expensesPayload.expenses || []
       }));
       setActiveTab(config.user?.role === "admin" ? "supplier" : "booster");
     } catch (error) {
@@ -244,7 +268,7 @@ export function App() {
 
   useEffect(() => {
     if (isAdmin) return;
-    if (["supplier", "supplierHistory", "profit", "prices"].includes(activeTab)) setActiveTab("booster");
+    if (["supplier", "supplierHistory", "expenses", "profit", "prices", "calculator"].includes(activeTab)) setActiveTab("booster");
   }, [activeTab, isAdmin]);
 
   const runAction = async (action) => {
@@ -604,6 +628,46 @@ export function App() {
     showToast("Balance adjustment removed.");
   });
 
+  const submitExternalExpense = (event) => runAction(async () => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const body = Object.fromEntries(form.entries());
+    body.amount = Number(body.amount);
+    await request("/api/external-expenses", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+    setExpenseFormKey((key) => key + 1);
+    await loadExpenses();
+    showToast("External expense recorded.");
+  });
+
+  const patchExternalExpense = (id, body, message = "External expense updated.") => runAction(async () => {
+    const payload = await request(`/api/external-expenses/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    setEditing(null);
+    setData((current) => ({
+      ...current,
+      externalExpenses: payload.expenses || current.externalExpenses.map((e) => (e.id === id ? payload.expense : e))
+    }));
+    showToast(message);
+  });
+
+  const deleteExternalExpense = (expense) => runAction(async () => {
+    const confirmed = await askConfirm({
+      title: "Delete external expense?",
+      body: `This removes the ${money(expense.amount)} ${expense.category} (${expense.title || "expense"}). This action cannot be undone.`,
+      confirmLabel: "Delete expense",
+      dangerous: true
+    });
+    if (!confirmed) return;
+    const payload = await request(`/api/external-expenses/${expense.id}`, { method: "DELETE" });
+    setData((current) => ({
+      ...current,
+      externalExpenses: payload.expenses || current.externalExpenses.filter((e) => e.id !== expense.id)
+    }));
+    showToast("External expense deleted.");
+  });
+
   const saveSupplierPrices = (event) => runAction(async () => {
     event.preventDefault();
     validateRateRows(data.supplierServices, "type", "service");
@@ -946,6 +1010,21 @@ export function App() {
           />
         )}
 
+        {activeTab === "expenses" && (
+          <ExpensesPage
+            isAdmin={isAdmin}
+            loading={loading}
+            loadError={loadError}
+            expenses={data.externalExpenses}
+            editing={editing}
+            formKey={expenseFormKey}
+            onSubmitExpense={submitExternalExpense}
+            onPatchExpense={patchExternalExpense}
+            onDeleteExpense={deleteExternalExpense}
+            onSetEditing={setEditing}
+          />
+        )}
+
         {activeTab === "profit" && (
           <ProfitReportPage isAdmin={isAdmin} refreshVersion={profitRefreshVersion} />
         )}
@@ -982,6 +1061,13 @@ export function App() {
             onSetDefaultArmorRow={setDefaultArmorRow}
             onUpdateArmorRow={updateArmorRow}
             onSaveArmorTypes={saveArmorTypes}
+          />
+        )}
+
+        {activeTab === "calculator" && (
+          <PriceCalculatorPage
+            isAdmin={isAdmin}
+            supplierServices={data.supplierServices}
           />
         )}
       </div>

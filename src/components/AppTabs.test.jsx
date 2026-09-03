@@ -18,7 +18,9 @@ describe("AppTabs", () => {
     const onChange = vi.fn();
     render(<AppTabs activeTab="supplier" isAdmin onChange={onChange} />);
 
-    expect(screen.getAllByRole("tab")).toHaveLength(5);
+    expect(screen.getAllByRole("tab")).toHaveLength(7);
+    expect(screen.getByRole("tab", { name: "Expenses" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Price calculator" })).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Paid history" }));
     expect(onChange).toHaveBeenCalledWith("supplierHistory");
   });

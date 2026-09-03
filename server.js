@@ -44,6 +44,11 @@ import {
   updateSupplierServices,
   updateBoosterPrices,
   updateArmorTypes,
+  getExternalExpensesPayload,
+  insertExternalExpense,
+  getExternalExpenseById,
+  updateExternalExpense,
+  deleteExternalExpense,
   getProfitReportData,
   getSessionFromDb,
   saveSessionToDb,
@@ -233,7 +238,8 @@ function permissionsFor(session) {
     boosterPaid: canManageAdmin(session),
     boosterDelete: canUseBooster(session),
     profitReport: canManageAdmin(session),
-    priceSettings: canManageAdmin(session)
+    priceSettings: canManageAdmin(session),
+    externalExpenses: canManageAdmin(session)
   };
 }
 
@@ -936,6 +942,97 @@ async function handleApi(req, res, url) {
     const cleaned = cleanArmorRows(body.rows);
     const armorTypes = await updateArmorTypes(cleaned);
     return sendJson(res, 200, { armorTypes });
+  }
+
+  if (pathname === "/api/external-expenses" && req.method === "GET") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view external expenses.");
+    const payload = await getExternalExpensesPayload();
+    return sendJson(res, 200, payload);
+  }
+
+  if (pathname === "/api/external-expenses" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can record external expenses.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return sendJson(res, 400, { error: "Amount must be a positive number." });
+    }
+    const title = String(body.title || "").trim();
+    if (!title) {
+      return sendJson(res, 400, { error: "Expense description or title is required." });
+    }
+    const category = String(body.category || "Raid payment").trim();
+    const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
+    if (!validIsoDate(date)) {
+      return sendJson(res, 400, { error: "Choose a valid expense date." });
+    }
+    const recipient = String(body.recipient || "").trim();
+    const note = String(body.note || "").trim();
+
+    const record = await insertExternalExpense({
+      date,
+      category,
+      title,
+      amount,
+      recipient,
+      note
+    }, session);
+    const payload = await getExternalExpensesPayload();
+    return sendJson(res, 200, { expense: record, ...payload });
+  }
+
+  if (pathname.startsWith("/api/external-expenses/") && req.method === "PATCH") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update external expenses.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getExternalExpenseById(id);
+    if (!existing) return sendJson(res, 404, { error: "Expense not found." });
+
+    const body = await readJson(req);
+    const updates = {};
+    if ("amount" in body) {
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return sendJson(res, 400, { error: "Amount must be a positive number." });
+      updates.amount = amount;
+    }
+    if ("title" in body) {
+      const title = String(body.title || "").trim();
+      if (!title) return sendJson(res, 400, { error: "Expense description cannot be empty." });
+      updates.title = title;
+    }
+    if ("category" in body) {
+      const category = String(body.category || "").trim();
+      if (!category) return sendJson(res, 400, { error: "Category cannot be empty." });
+      updates.category = category;
+    }
+    if ("date" in body) {
+      const date = String(body.date || "").trim();
+      if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid expense date." });
+      updates.date = date;
+    }
+    if ("recipient" in body) {
+      updates.recipient = String(body.recipient || "").trim();
+    }
+    if ("note" in body) {
+      updates.note = String(body.note || "").trim();
+    }
+
+    const updated = await updateExternalExpense(id, updates);
+    const payload = await getExternalExpensesPayload();
+    return sendJson(res, 200, { expense: updated, ...payload });
+  }
+
+  if (pathname.startsWith("/api/external-expenses/") && req.method === "DELETE") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete external expenses.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getExternalExpenseById(id);
+    if (!existing) return sendJson(res, 404, { error: "Expense not found." });
+
+    await deleteExternalExpense(id);
+    const payload = await getExternalExpensesPayload();
+    return sendJson(res, 200, { deletedId: id, ...payload });
   }
 
   sendJson(res, 404, { error: "Not found." });

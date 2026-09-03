@@ -82,7 +82,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
           <div>
             <p className="section-kicker">Admin financial report</p>
             <h2>Profit & Margin Report</h2>
-            <p className="panel-note">Paid supplier sales minus paid booster payouts, grouped by weekly or monthly payout cycles.</p>
+            <p className="panel-note">Paid supplier sales minus paid booster payouts and external expenses (raid & outsource payments), grouped by weekly or monthly payout cycles.</p>
           </div>
           <span>{rangeLabel(report?.range || requestOptions)}</span>
         </header>
@@ -121,6 +121,14 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
             <strong className="text-sky-300">{money(totals.boosterPayoutTotal)}</strong>
             <small>{totals.boosterRecordCount} payout rows</small>
           </div>
+          <div className="border-t-2 border-t-purple-500/80">
+            <span className="batch-label">External expenses</span>
+            <strong className="text-purple-300">{money(totals.externalExpenseTotal)}</strong>
+            <small>
+              {totals.externalExpenseCount} row{totals.externalExpenseCount === 1 ? "" : "s"}
+              {totals.externalExpenseTotal > 0 && ` (Raid: ${money(totals.raidPaymentTotal)}, M+: ${money(totals.outsourcePaymentTotal)})`}
+            </small>
+          </div>
           <div className={cn(netTone, totals.netProfit < 0 ? "border-t-2 border-t-rose-500/80" : "border-t-2 border-t-emerald-500/80")}>
             <div className="flex items-center justify-between">
               <span className="batch-label">Net profit</span>
@@ -131,7 +139,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
               )}
             </div>
             <strong className={totals.netProfit < 0 ? "text-rose-300" : "text-emerald-300"}>{money(totals.netProfit)}</strong>
-            <small>Supplier paid minus booster paid</small>
+            <small>Revenue minus payouts & expenses</small>
           </div>
         </section>
 
@@ -146,6 +154,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
                   <TableHead>{mode === "monthly" ? "Month" : "Weekly Cycle"}</TableHead>
                   <TableHead>Supplier paid</TableHead>
                   <TableHead>Booster payouts</TableHead>
+                  <TableHead>External expenses</TableHead>
                   <TableHead>Net profit</TableHead>
                 </TableRow>
               </TableHeader>
@@ -165,6 +174,18 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
                     </TableCell>
                     <TableCell className="font-mono tabular-nums">{money(row.supplierPaidTotal)}</TableCell>
                     <TableCell className="font-mono tabular-nums">{money(row.boosterPayoutTotal)}</TableCell>
+                    <TableCell className="font-mono tabular-nums text-purple-300">
+                      <div className="flex flex-col">
+                        <span>{money(row.externalExpenseTotal)}</span>
+                        {row.externalExpenseTotal > 0 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {row.raidPaymentTotal > 0 && `R: ${money(row.raidPaymentTotal)}`}
+                            {row.raidPaymentTotal > 0 && row.outsourcePaymentTotal > 0 && " | "}
+                            {row.outsourcePaymentTotal > 0 && `M+: ${money(row.outsourcePaymentTotal)}`}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className={cn("font-mono tabular-nums", row.netProfit < 0 ? "profit-negative-text" : "profit-positive-text")}>
                       <div className="flex items-center gap-2">
                         <span>{money(row.netProfit)}</span>
@@ -192,9 +213,13 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
 const emptyTotals = {
   supplierPaidTotal: 0,
   boosterPayoutTotal: 0,
+  externalExpenseTotal: 0,
+  raidPaymentTotal: 0,
+  outsourcePaymentTotal: 0,
   netProfit: 0,
   supplierRecordCount: 0,
-  boosterRecordCount: 0
+  boosterRecordCount: 0,
+  externalExpenseCount: 0
 };
 
 function reportOptions(mode, filters) {
