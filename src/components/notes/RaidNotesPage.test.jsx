@@ -92,6 +92,17 @@ describe("RaidNotesPage", () => {
     );
   });
 
+  it("copies individual buyer name to clipboard", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const writeTextSpy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const copyBuyerBtn = screen.getByRole("button", { name: "Copy Veliandina-tichondrius" });
+    await user.click(copyBuyerBtn);
+
+    expect(writeTextSpy).toHaveBeenCalledWith("Veliandina-tichondrius");
+  });
+
   it("toggles an active buyer item completed", async () => {
     const user = userEvent.setup();
     const { onUpdateNote } = renderPage();

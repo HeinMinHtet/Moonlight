@@ -42,6 +42,7 @@ const COLOR_MENU_ITEMS = [
 export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
   const [newBuyer, setNewBuyer] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedItemId, setCopiedItemId] = useState(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(note.title);
   const inputRef = useRef(null);
@@ -61,6 +62,22 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
   const handleDeleteItem = async (itemId) => {
     const updatedItems = items.filter((item) => item.id !== itemId);
     await onUpdateNote(note.id, { items: updatedItems });
+  };
+
+  const handleCopyBuyerName = async (item, e) => {
+    e?.stopPropagation?.();
+    const text = String(item?.text || "").trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedItemId(item.id);
+      toast.success(`Copied "${text}"`);
+      setTimeout(() => {
+        setCopiedItemId((current) => (current === item.id ? null : current));
+      }, 1800);
+    } catch {
+      toast.error("Failed to copy to clipboard.");
+    }
   };
 
   const handleAddBuyer = async () => {
@@ -255,7 +272,7 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
             <div
               key={item.id}
               className={cn(
-                "group/item flex items-center justify-between gap-2 px-1 py-1 rounded hover:bg-black/10 transition-colors",
+                "group/item flex items-center justify-between gap-2 px-1.5 py-1 rounded hover:bg-black/10 transition-colors",
                 isDone && "opacity-60"
               )}
             >
@@ -272,14 +289,34 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
                 />
                 <span className="text-xs font-mono truncate">{item.text}</span>
               </label>
-              <button
-                type="button"
-                onClick={() => handleDeleteItem(item.id)}
-                className="text-muted-foreground/60 hover:text-destructive opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5"
-                title="Delete item"
-              >
-                <X className="size-3" />
-              </button>
+
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => handleCopyBuyerName(item, e)}
+                  className={cn(
+                    "p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/15 transition-colors",
+                    copiedItemId === item.id && "text-emerald-400 hover:text-emerald-400"
+                  )}
+                  title={`Copy ${item.text}`}
+                  aria-label={`Copy ${item.text}`}
+                >
+                  {copiedItemId === item.id ? (
+                    <Check className="size-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteItem(item.id)}
+                  className="p-1 rounded text-muted-foreground/50 hover:text-destructive hover:bg-black/15 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                  title="Delete item"
+                  aria-label={`Delete ${item.text}`}
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
             </div>
           );
         })}
