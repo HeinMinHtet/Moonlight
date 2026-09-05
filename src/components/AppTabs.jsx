@@ -1,10 +1,11 @@
 import React from "react";
-import { Calculator, ChartNoAxesCombined, Coins, History, Receipt, ScrollText, SlidersHorizontal } from "lucide-react";
+import { Calculator, ChartNoAxesCombined, Coins, History, ListTodo, Receipt, ScrollText, SlidersHorizontal } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.jsx";
 
 const tabs = [
   { id: "supplier", label: "Sales ledger", icon: ScrollText, adminOnly: true },
   { id: "supplierHistory", label: "Paid history", icon: History, adminOnly: true },
+  { id: "notes", label: "Raid notes", icon: ListTodo, adminOnly: true },
   { id: "booster", label: "Booster payouts", icon: Coins },
   { id: "expenses", label: "Expenses", icon: Receipt, adminOnly: true },
   { id: "profit", label: "Profit report", icon: ChartNoAxesCombined, adminOnly: true },

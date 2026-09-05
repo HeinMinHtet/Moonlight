@@ -49,6 +49,11 @@ import {
   getExternalExpenseById,
   updateExternalExpense,
   deleteExternalExpense,
+  getRaidNotesPayload,
+  insertRaidNote,
+  getRaidNoteById,
+  updateRaidNote,
+  deleteRaidNote,
   getProfitReportData,
   getSessionFromDb,
   saveSessionToDb,
@@ -239,7 +244,8 @@ function permissionsFor(session) {
     boosterDelete: canUseBooster(session),
     profitReport: canManageAdmin(session),
     priceSettings: canManageAdmin(session),
-    externalExpenses: canManageAdmin(session)
+    externalExpenses: canManageAdmin(session),
+    raidNotes: canManageAdmin(session)
   };
 }
 
@@ -1032,6 +1038,79 @@ async function handleApi(req, res, url) {
 
     await deleteExternalExpense(id);
     const payload = await getExternalExpensesPayload();
+    return sendJson(res, 200, { deletedId: id, ...payload });
+  }
+
+  if (pathname === "/api/raid-notes" && req.method === "GET") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view raid notes.");
+    const payload = await getRaidNotesPayload();
+    return sendJson(res, 200, payload);
+  }
+
+  if (pathname === "/api/raid-notes" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can create raid notes.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const title = String(body.title || "").trim();
+    if (!title) return sendJson(res, 400, { error: "Raid note title is required." });
+    const raidDate = String(body.raidDate || "").trim() || new Date().toISOString().slice(0, 10);
+    if (!validIsoDate(raidDate)) return sendJson(res, 400, { error: "Choose a valid raid date." });
+    const raidTime = String(body.raidTime || "").trim();
+    const color = String(body.color || "default").trim();
+    const pinned = Boolean(body.pinned);
+    const items = Array.isArray(body.items) ? body.items : [];
+
+    const record = await insertRaidNote({
+      title,
+      raidDate,
+      raidTime,
+      color,
+      pinned,
+      items
+    }, session);
+    const payload = await getRaidNotesPayload();
+    return sendJson(res, 201, { note: record, ...payload });
+  }
+
+  if (pathname.startsWith("/api/raid-notes/") && req.method === "PATCH") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update raid notes.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getRaidNoteById(id);
+    if (!existing) return sendJson(res, 404, { error: "Raid note not found." });
+
+    const body = await readJson(req);
+    const updates = {};
+    if ("title" in body) {
+      const title = String(body.title || "").trim();
+      if (!title) return sendJson(res, 400, { error: "Raid note title cannot be empty." });
+      updates.title = title;
+    }
+    if ("raidDate" in body) {
+      const raidDate = String(body.raidDate || "").trim();
+      if (!validIsoDate(raidDate)) return sendJson(res, 400, { error: "Choose a valid raid date." });
+      updates.raidDate = raidDate;
+    }
+    if ("raidTime" in body) updates.raidTime = String(body.raidTime || "").trim();
+    if ("color" in body) updates.color = String(body.color || "default").trim();
+    if ("pinned" in body) updates.pinned = Boolean(body.pinned);
+    if ("archived" in body) updates.archived = Boolean(body.archived);
+    if ("items" in body && Array.isArray(body.items)) updates.items = body.items;
+
+    const updated = await updateRaidNote(id, updates);
+    const payload = await getRaidNotesPayload();
+    return sendJson(res, 200, { note: updated, ...payload });
+  }
+
+  if (pathname.startsWith("/api/raid-notes/") && req.method === "DELETE") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete raid notes.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getRaidNoteById(id);
+    if (!existing) return sendJson(res, 404, { error: "Raid note not found." });
+
+    await deleteRaidNote(id);
+    const payload = await getRaidNotesPayload();
     return sendJson(res, 200, { deletedId: id, ...payload });
   }
 

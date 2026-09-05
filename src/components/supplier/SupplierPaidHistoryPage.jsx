@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton.jsx";
 const filterDefaults = {
   buyer: "",
   service: "all",
+  armorType: "all",
   paidBy: "all",
   paidFrom: "",
   paidTo: "",
@@ -26,12 +27,18 @@ export function SupplierPaidHistoryPage({
   loading,
   loadError,
   records,
+  armorTypes = [],
   canReopen,
   onExportBatch,
   onReopenBatch
 }) {
   const [filters, setFilters] = useState(filterDefaults);
   const serviceOptions = useMemo(() => uniqueSorted(records.map((record) => record.serviceType)), [records]);
+  const armorOptions = useMemo(() => {
+    const fromConfig = (armorTypes || []).map((item) => (typeof item === "object" ? item.name : item));
+    const fromRecords = records.map((record) => record.armorType);
+    return uniqueSorted([...fromConfig, ...fromRecords]);
+  }, [armorTypes, records]);
   const paidByOptions = useMemo(
     () => uniqueSorted(records.map((record) => record.paidByName || "Admin")),
     [records]
@@ -45,16 +52,41 @@ export function SupplierPaidHistoryPage({
     () => filteredRecords.reduce((sum, record) => sum + Number(record.totalCost || 0), 0),
     [filteredRecords]
   );
+  const filteredQuantity = useMemo(
+    () => filteredRecords.reduce((sum, record) => sum + Number(record.quantity || 0), 0),
+    [filteredRecords]
+  );
   const paidByCount = useMemo(
     () => new Set(filteredRecords.map((record) => record.paidByDiscordId || record.paidByName || "Admin")).size,
     [filteredRecords]
   );
+  const filteredItemSummary = useMemo(() => {
+    const summaryMap = new Map();
+    for (const record of filteredRecords) {
+      const service = record.serviceType || "Unknown service";
+      const armor = record.armorType || "No stack";
+      const key = `${service}__${armor}`;
+      const existing = summaryMap.get(key) || {
+        service,
+        armor,
+        totalQty: 0,
+        totalCost: 0
+      };
+      existing.totalQty += Number(record.quantity || 0);
+      existing.totalCost += Number(record.totalCost || 0);
+      summaryMap.set(key, existing);
+    }
+    return [...summaryMap.values()].sort(
+      (a, b) => a.service.localeCompare(b.service) || a.armor.localeCompare(b.armor)
+    );
+  }, [filteredRecords]);
 
   const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
 
   const isFiltered = Boolean(
     filters.buyer ||
     filters.service !== "all" ||
+    filters.armorType !== "all" ||
     filters.paidBy !== "all" ||
     filters.paidFrom ||
     filters.paidTo ||
@@ -75,11 +107,32 @@ export function SupplierPaidHistoryPage({
           <span>{records.length} paid records</span>
         </div>
 
-        <section className="batch-bar" aria-label="Filtered paid supplier totals">
-          <div className="border-t-2 border-t-emerald-500/80"><span className="batch-label">Paid total</span><strong className="text-emerald-300">{money(filteredTotal)}</strong></div>
-          <div className="border-t-2 border-t-sky-400/80"><span className="batch-label">Payment batches</span><strong className="text-sky-300">{batches.length}</strong></div>
-          <div className="border-t-2 border-t-sky-400/80"><span className="batch-label">Sales records</span><strong className="text-sky-300">{filteredRecords.length}</strong></div>
-          <div className="border-t-2 border-t-amber-400/80"><span className="batch-label">Paid by</span><strong className="text-amber-300">{paidByCount}</strong></div>
+        <section className="batch-bar history-stat-bar" aria-label="Filtered paid supplier totals">
+          <div className="border-t-2 border-t-emerald-500/80">
+            <span className="batch-label">Total sales</span>
+            <strong className="text-emerald-300">{money(filteredTotal)}</strong>
+            <small>{filteredQuantity} item{filteredQuantity === 1 ? "" : "s"} sold</small>
+          </div>
+          <div className="border-t-2 border-t-sky-400/80">
+            <span className="batch-label">Items sold</span>
+            <strong className="text-sky-300">{filteredQuantity}</strong>
+            <small>{filteredRecords.length} sales row{filteredRecords.length === 1 ? "" : "s"}</small>
+          </div>
+          <div className="border-t-2 border-t-sky-400/80">
+            <span className="batch-label">Payment batches</span>
+            <strong className="text-sky-300">{batches.length}</strong>
+            <small>Completed batches</small>
+          </div>
+          <div className="border-t-2 border-t-sky-400/80">
+            <span className="batch-label">Sales records</span>
+            <strong className="text-sky-300">{filteredRecords.length}</strong>
+            <small>Across {batches.length} batch{batches.length === 1 ? "" : "es"}</small>
+          </div>
+          <div className="border-t-2 border-t-amber-400/80">
+            <span className="batch-label">Paid by</span>
+            <strong className="text-amber-300">{paidByCount}</strong>
+            <small>Admin{paidByCount === 1 ? "" : "s"}</small>
+          </div>
         </section>
 
         <section className="filter-bar history-filter-bar" aria-label="Paid supplier history filters">
@@ -97,6 +150,13 @@ export function SupplierPaidHistoryPage({
             <NativeSelect value={filters.service} onChange={(event) => updateFilter("service", event.target.value)}>
               <option value="all">All services</option>
               {serviceOptions.map((service) => <option key={service} value={service}>{service}</option>)}
+            </NativeSelect>
+          </Label>
+          <Label className="filter-select">
+            Armor stack
+            <NativeSelect value={filters.armorType} onChange={(event) => updateFilter("armorType", event.target.value)}>
+              <option value="all">All armor stacks</option>
+              {armorOptions.map((armor) => <option key={armor} value={armor}>{armor}</option>)}
             </NativeSelect>
           </Label>
           <Label className="filter-select">
@@ -132,6 +192,50 @@ export function SupplierPaidHistoryPage({
             Clear filters
           </Button>
         </section>
+
+        {!loading && !loadError && filteredRecords.length > 0 && (
+          <details className="history-summary-details" open={isFiltered}>
+            <summary className="history-summary-toggle">
+              <span>Filtered items sales lookup ({filteredItemSummary.length} item type{filteredItemSummary.length === 1 ? "" : "s"})</span>
+              <strong className="text-emerald-300 font-mono font-semibold">{money(filteredTotal)}</strong>
+            </summary>
+            <div className="history-summary-content">
+              <table className="history-summary-table">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Armor stack</th>
+                    <th className="text-right">Qty</th>
+                    <th className="text-right">Total sale</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItemSummary.map((item) => (
+                    <tr key={`${item.service}__${item.armor}`}>
+                      <td className="font-medium">{item.service}</td>
+                      <td>
+                        <span className="history-armor-badge">
+                          {item.armor}
+                        </span>
+                      </td>
+                      <td className="text-right font-mono">{item.totalQty}</td>
+                      <td className="text-right font-mono font-semibold text-emerald-300">
+                        {money(item.totalCost)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}>Filtered total</td>
+                    <td className="text-right font-mono">{filteredQuantity}</td>
+                    <td className="text-right font-mono text-emerald-300">{money(filteredTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </details>
+        )}
 
         {loading && <div className="space-y-2 p-4" aria-label="Loading paid supplier history"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>}
         {!loading && loadError && <Alert variant="destructive" className="m-4"><AlertTitle>Could not load paid supplier history</AlertTitle><AlertDescription>{loadError}</AlertDescription></Alert>}
@@ -209,6 +313,7 @@ function matchesFilters(record, filters) {
   const buyer = String(record.buyerName || "").toLocaleLowerCase();
   if (filters.buyer && !buyer.includes(filters.buyer.trim().toLocaleLowerCase())) return false;
   if (filters.service !== "all" && record.serviceType !== filters.service) return false;
+  if (filters.armorType !== "all" && (record.armorType || "No stack") !== filters.armorType) return false;
   if (filters.paidBy !== "all" && (record.paidByName || "Admin") !== filters.paidBy) return false;
   const paidDate = String(record.paidAt || "").slice(0, 10);
   const saleDate = String(record.date || "").slice(0, 10);

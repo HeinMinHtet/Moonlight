@@ -18,6 +18,18 @@ export function DropdownMenuContent({ className, sideOffset = 4, ...props }) {
   );
 }
 
+export function DropdownMenuItem({ className, ...props }) {
+  return (
+    <DropdownMenuPrimitive.Item
+      className={cn(
+        "relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-secondary focus:text-secondary-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
 export function DropdownMenuLabel({ className, ...props }) {
   return <DropdownMenuPrimitive.Label className={cn("px-2 py-1.5 text-xs font-semibold", className)} {...props} />;
 }

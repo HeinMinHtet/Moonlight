@@ -9,6 +9,7 @@ import { ProfitReportPage } from "./components/profit/ProfitReportPage.jsx";
 import { RateSettingsPage } from "./components/rates/RateSettingsPage.jsx";
 import { SupplierPaidHistoryPage } from "./components/supplier/SupplierPaidHistoryPage.jsx";
 import { SupplierUnpaidPage } from "./components/supplier/SupplierUnpaidPage.jsx";
+import { RaidNotesPage } from "./components/notes/RaidNotesPage.jsx";
 import { mmk, money } from "./utils/format.js";
 import { exportSupplierReport } from "./utils/exportSupplierReport.js";
 import { buildSupplierSummary, supplierBatchWarnings } from "./utils/supplierBatch.js";
@@ -40,7 +41,8 @@ const initialState = {
   boosterSummary: [],
   boosterAdjustments: [],
   boosterCashVault: [],
-  externalExpenses: []
+  externalExpenses: [],
+  raidNotes: []
 };
 
 export function App() {
@@ -72,7 +74,8 @@ export function App() {
     canDeleteSupplierRows: Boolean(data.permissions.supplierDelete),
     canEditPrices: Boolean(data.permissions.priceSettings),
     canMarkBoosterPaid: Boolean(data.permissions.boosterPaid),
-    canDeleteBoosterRows: Boolean(data.permissions.boosterDelete)
+    canDeleteBoosterRows: Boolean(data.permissions.boosterDelete),
+    canUseNotes: Boolean(data.permissions.raidNotes)
   };
 
   const showToast = useCallback((message) => {
@@ -134,6 +137,18 @@ export function App() {
     }));
   }, [data.permissions]);
 
+  const loadRaidNotes = useCallback(async (activePermissions = data.permissions) => {
+    if (!activePermissions.raidNotes) {
+      setData((current) => ({ ...current, raidNotes: [] }));
+      return;
+    }
+    const payload = await api("/api/raid-notes");
+    setData((current) => ({
+      ...current,
+      raidNotes: payload.notes || []
+    }));
+  }, [data.permissions]);
+
   const pollVisibleData = useCallback(async () => {
     if (pollingRef.current || foregroundActionRef.current) return;
     pollingRef.current = true;
@@ -143,10 +158,12 @@ export function App() {
       const needsSupplier = config.permissions.supplierRecords && ["supplier", "supplierHistory", "prices", "calculator"].includes(activeTab);
       const needsBoosters = config.permissions.boosterRecords && ["booster", "prices"].includes(activeTab);
       const needsExpenses = config.permissions.externalExpenses && ["expenses", "profit"].includes(activeTab);
-      const [supplierPayload, boosterPayload, expensesPayload] = await Promise.all([
+      const needsNotes = config.permissions.raidNotes && activeTab === "notes";
+      const [supplierPayload, boosterPayload, expensesPayload, notesPayload] = await Promise.all([
         needsSupplier ? api("/api/supplier-records") : Promise.resolve(null),
         needsBoosters ? api("/api/booster-records") : Promise.resolve(null),
-        needsExpenses ? api("/api/external-expenses") : Promise.resolve(null)
+        needsExpenses ? api("/api/external-expenses") : Promise.resolve(null),
+        needsNotes ? api("/api/raid-notes") : Promise.resolve(null)
       ]);
 
       if (foregroundActionRef.current || dataVersionRef.current !== startedAtVersion) return;
@@ -185,7 +202,10 @@ export function App() {
             : config.permissions.boosterRecords ? current.boosterCashVault : [],
           externalExpenses: expensesPayload
             ? (expensesPayload.expenses || [])
-            : config.permissions.externalExpenses ? current.externalExpenses : []
+            : config.permissions.externalExpenses ? current.externalExpenses : [],
+          raidNotes: notesPayload
+            ? (notesPayload.notes || [])
+            : config.permissions.raidNotes ? current.raidNotes : []
         };
       });
       if (activeTab === "profit" && config.user?.role === "admin") {
@@ -203,10 +223,11 @@ export function App() {
     setLoadError("");
     try {
       const config = await api("/api/config");
-      const [supplierPayload, boosterPayload, expensesPayload] = await Promise.all([
+      const [supplierPayload, boosterPayload, expensesPayload, notesPayload] = await Promise.all([
         config.permissions.supplierRecords ? api("/api/supplier-records") : Promise.resolve({ records: [], paidRecords: [], summary: [], withdrawals: [] }),
         config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [], adjustments: [], vaultTransactions: [] }),
-        config.permissions.externalExpenses ? api("/api/external-expenses") : Promise.resolve({ expenses: [] })
+        config.permissions.externalExpenses ? api("/api/external-expenses") : Promise.resolve({ expenses: [] }),
+        config.permissions.raidNotes ? api("/api/raid-notes") : Promise.resolve({ notes: [] })
       ]);
       setData((current) => ({
         ...current,
@@ -219,7 +240,8 @@ export function App() {
         boosterSummary: boosterPayload.summary || [],
         boosterAdjustments: boosterPayload.adjustments || [],
         boosterCashVault: boosterPayload.vaultTransactions || [],
-        externalExpenses: expensesPayload.expenses || []
+        externalExpenses: expensesPayload.expenses || [],
+        raidNotes: notesPayload.notes || []
       }));
       setActiveTab(config.user?.role === "admin" ? "supplier" : "booster");
     } catch (error) {
@@ -268,7 +290,7 @@ export function App() {
 
   useEffect(() => {
     if (isAdmin) return;
-    if (["supplier", "supplierHistory", "expenses", "profit", "prices", "calculator"].includes(activeTab)) setActiveTab("booster");
+    if (["supplier", "supplierHistory", "notes", "expenses", "profit", "prices", "calculator"].includes(activeTab)) setActiveTab("booster");
   }, [activeTab, isAdmin]);
 
   const runAction = async (action) => {
@@ -295,11 +317,16 @@ export function App() {
     const boosterReviewCount = data.boosterRecords.filter(
       (r) => !r.paid && (!String(r.note || "").trim() || Number(r.totalBalance || 0) <= 0 || Number(r.quantity || 0) > 20)
     ).length;
+    const today = new Date().toISOString().slice(0, 10);
+    const todayNotesCount = (data.raidNotes || []).filter(
+      (n) => !n.archived && n.raidDate === today
+    ).length;
     return {
       supplier: unverifiedSupplierCount,
-      booster: boosterReviewCount
+      booster: boosterReviewCount,
+      notes: todayNotesCount
     };
-  }, [data.supplierRecords, data.boosterRecords]);
+  }, [data.supplierRecords, data.boosterRecords, data.raidNotes]);
 
   const supplierGrandTotal = useMemo(
     () => data.supplierSummary.reduce((sum, row) => sum + Number(row.totalCost || 0), 0),
@@ -668,6 +695,46 @@ export function App() {
     showToast("External expense deleted.");
   });
 
+  const createRaidNote = (noteData) => runAction(async () => {
+    const payload = await request("/api/raid-notes", {
+      method: "POST",
+      body: JSON.stringify(noteData)
+    });
+    setData((current) => ({
+      ...current,
+      raidNotes: payload.notes || [payload.note, ...current.raidNotes]
+    }));
+    showToast("Raid note created.");
+  });
+
+  const patchRaidNote = (id, updates) => runAction(async () => {
+    const payload = await request(`/api/raid-notes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates)
+    });
+    setData((current) => ({
+      ...current,
+      raidNotes: payload.notes || current.raidNotes.map((n) => (n.id === id ? payload.note : n))
+    }));
+  });
+
+  const deleteRaidNote = (id) => runAction(async () => {
+    const note = (data.raidNotes || []).find((n) => n.id === id);
+    const confirmed = await askConfirm({
+      title: "Delete raid note?",
+      body: `This removes "${note?.title || "this raid note"}" and all of its buyer checklist items. This action cannot be undone.`,
+      confirmLabel: "Delete raid note",
+      dangerous: true
+    });
+    if (!confirmed) return;
+    const payload = await request(`/api/raid-notes/${id}`, { method: "DELETE" });
+    setData((current) => ({
+      ...current,
+      raidNotes: payload.notes || current.raidNotes.filter((n) => n.id !== id)
+    }));
+    showToast("Raid note deleted.");
+  });
+
   const saveSupplierPrices = (event) => runAction(async () => {
     event.preventDefault();
     validateRateRows(data.supplierServices, "type", "service");
@@ -977,9 +1044,22 @@ export function App() {
             loading={loading}
             loadError={loadError}
             records={data.supplierHistory}
+            armorTypes={data.armorTypes}
             canReopen={permissions.canReopenSupplierPaid}
             onExportBatch={exportPaidSupplierBatch}
             onReopenBatch={reopenSupplierPaymentBatch}
+          />
+        )}
+
+        {activeTab === "notes" && (
+          <RaidNotesPage
+            isAdmin={isAdmin}
+            loading={loading}
+            loadError={loadError}
+            notes={data.raidNotes}
+            onCreateNote={createRaidNote}
+            onUpdateNote={patchRaidNote}
+            onDeleteNote={deleteRaidNote}
           />
         )}
 
