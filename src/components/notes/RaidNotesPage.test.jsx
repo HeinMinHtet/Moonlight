@@ -119,6 +119,40 @@ describe("RaidNotesPage", () => {
     });
   });
 
+  it("edits title, date, and time when clicking the edit button", async () => {
+    const user = userEvent.setup();
+    const { onUpdateNote } = renderPage();
+
+    // Click the edit button on the first note
+    const editBtns = screen.getAllByRole("button", { name: /Edit title, date & time/i });
+    await user.click(editBtns[0]);
+
+    // Edit Title
+    const titleInput = screen.getByLabelText("Edit raid title");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Mythic 8/8 8pm");
+
+    // Edit Date
+    const dateInput = screen.getByLabelText("Edit raid date");
+    await user.clear(dateInput);
+    await user.type(dateInput, "2026-09-08");
+
+    // Edit Time
+    const timeInput = screen.getByLabelText("Edit raid time");
+    await user.clear(timeInput);
+    await user.type(timeInput, "8:00 PM");
+
+    // Click Save
+    const saveBtn = screen.getByRole("button", { name: /^Save$/i });
+    await user.click(saveBtn);
+
+    expect(onUpdateNote).toHaveBeenCalledWith("note-1", {
+      title: "Mythic 8/8 8pm",
+      raidDate: "2026-09-08",
+      raidTime: "8:00 PM"
+    });
+  });
+
   it("filters notes by search query for buyer name", async () => {
     const user = userEvent.setup();
     renderPage();

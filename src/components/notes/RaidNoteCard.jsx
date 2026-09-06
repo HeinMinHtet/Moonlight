@@ -11,7 +11,8 @@ import {
   Palette,
   Clock,
   Calendar,
-  X
+  X,
+  Pencil
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -43,8 +44,11 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
   const [newBuyer, setNewBuyer] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedItemId, setCopiedItemId] = useState(null);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(note.title);
+  const [isEditing, setIsEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(note.title || "");
+  const [dateDraft, setDateDraft] = useState(note.raidDate || "");
+  const [timeDraft, setTimeDraft] = useState(note.raidTime || "");
+  const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
 
   const items = Array.isArray(note.items) ? note.items : [];
@@ -131,12 +135,39 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
     }
   };
 
-  const handleSaveTitle = async () => {
-    setIsEditingTitle(false);
-    if (titleDraft.trim() && titleDraft !== note.title) {
-      await onUpdateNote(note.id, { title: titleDraft.trim() });
-    } else {
-      setTitleDraft(note.title);
+  const handleStartEdit = () => {
+    setTitleDraft(note.title || "");
+    setDateDraft(note.raidDate || "");
+    setTimeDraft(note.raidTime || "");
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setTitleDraft(note.title || "");
+    setDateDraft(note.raidDate || "");
+    setTimeDraft(note.raidTime || "");
+    setIsEditing(false);
+  };
+
+  const handleSaveDetails = async () => {
+    const trimmedTitle = titleDraft.trim();
+    if (!trimmedTitle) {
+      toast.error("Raid title cannot be empty.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onUpdateNote(note.id, {
+        title: trimmedTitle,
+        raidDate: dateDraft || "",
+        raidTime: timeDraft.trim()
+      });
+      setIsEditing(false);
+      toast.success("Raid details updated!");
+    } catch {
+      toast.error("Failed to update raid details.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -161,87 +192,177 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
         note.pinned && "ring-1 ring-amber-400/40"
       )}
     >
-      {/* Header: Title on the Left, Date & Time on the Right Side of Title */}
-      <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-border/30">
-        {/* Title area */}
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          {isEditingTitle ? (
+      {/* Header: Normal mode vs Edit Mode for Title, Date & Time */}
+      {isEditing ? (
+        <div className="space-y-2 mb-3 pb-2.5 border-b border-border/40">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
+              <Pencil className="size-3" />
+              Edit Details
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelEdit}
+                disabled={saving}
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveDetails}
+                disabled={saving}
+                className="h-6 px-2.5 text-xs font-semibold gap-1 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+              >
+                <Check className="size-3" />
+                Save
+              </Button>
+            </div>
+          </div>
+
+          {/* Title input */}
+          <div>
+            <label className="text-[10px] font-medium text-muted-foreground block mb-0.5">
+              Title
+            </label>
             <Input
+              aria-label="Edit raid title"
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleSaveTitle}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleSaveTitle();
-                if (e.key === "Escape") {
-                  setTitleDraft(note.title);
-                  setIsEditingTitle(false);
-                }
+                if (e.key === "Enter") handleSaveDetails();
+                if (e.key === "Escape") handleCancelEdit();
               }}
+              placeholder="Raid Title (e.g. Heroic 8/8 10 am)"
+              className="h-7 text-xs font-bold bg-field/90 border-border/80 focus-visible:ring-1 focus-visible:ring-primary"
               autoFocus
-              className="h-7 text-sm font-bold px-1 py-0 bg-field/90"
             />
-          ) : (
+          </div>
+
+          {/* Date & Time Row */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground block mb-0.5 flex items-center gap-1">
+                <Calendar className="size-2.5" />
+                Date
+              </label>
+              <Input
+                type="date"
+                aria-label="Edit raid date"
+                value={dateDraft}
+                onChange={(e) => setDateDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveDetails();
+                  if (e.key === "Escape") handleCancelEdit();
+                }}
+                className="h-7 text-xs bg-field/90 border-border/80 px-2 cursor-pointer focus-visible:ring-1 focus-visible:ring-primary"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground block mb-0.5 flex items-center gap-1">
+                <Clock className="size-2.5" />
+                Time
+              </label>
+              <Input
+                type="text"
+                aria-label="Edit raid time"
+                value={timeDraft}
+                onChange={(e) => setTimeDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveDetails();
+                  if (e.key === "Escape") handleCancelEdit();
+                }}
+                placeholder="e.g. 10:00 AM"
+                className="h-7 text-xs font-mono bg-field/90 border-border/80 px-2 focus-visible:ring-1 focus-visible:ring-primary"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-border/30">
+          {/* Title area */}
+          <div className="flex-1 min-w-0 flex items-center gap-2">
             <h3
-              onClick={() => setIsEditingTitle(true)}
+              onClick={handleStartEdit}
               className="text-sm font-bold truncate cursor-pointer hover:underline decoration-dashed decoration-primary underline-offset-4 text-foreground"
-              title="Click to edit title"
+              title="Click to edit details"
             >
               {note.title}
             </h3>
-          )}
-        </div>
+          </div>
 
-        {/* Right side: Time Badge, Date Badge, and Pin Button */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {note.raidTime && (
-            <Badge
-              variant="outline"
-              className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-sky-500/15 text-sky-300 border-sky-500/30 flex items-center gap-1"
-              title="Raid time"
-            >
-              <Clock className="size-3 text-sky-400" />
-              {note.raidTime}
-            </Badge>
-          )}
-
-          {note.raidDate && (
-            <Badge
-              variant="outline"
-              className="px-1.5 py-0.5 text-[11px] font-mono bg-field/70 text-muted-foreground border-border/60 flex items-center gap-1"
-              title="Raid date"
-            >
-              <Calendar className="size-3 text-muted-foreground/80" />
-              {note.raidDate}
-            </Badge>
-          )}
-
-          {note.archived && (
-            <Badge
-              variant="outline"
-              className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-            >
-              Completed
-            </Badge>
-          )}
-
-          {/* Pin toggle */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleTogglePin}
-            className={cn(
-              "size-7 transition-opacity ml-0.5",
-              note.pinned
-                ? "text-amber-400 fill-amber-400 opacity-100"
-                : "text-muted-foreground opacity-60 hover:opacity-100 hover:text-amber-400"
+          {/* Right side: Time Badge, Date Badge, Edit Button, and Pin Button */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {note.raidTime && (
+              <Badge
+                variant="outline"
+                onClick={handleStartEdit}
+                className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-sky-500/15 text-sky-300 border-sky-500/30 flex items-center gap-1 cursor-pointer hover:bg-sky-500/25 transition-colors"
+                title="Click to edit raid time"
+              >
+                <Clock className="size-3 text-sky-400" />
+                {note.raidTime}
+              </Badge>
             )}
-            title={note.pinned ? "Unpin note" : "Pin note"}
-          >
-            {note.pinned ? <Pin className="size-3.5 fill-amber-400" /> : <PinOff className="size-3.5" />}
-          </Button>
+
+            {note.raidDate && (
+              <Badge
+                variant="outline"
+                onClick={handleStartEdit}
+                className="px-1.5 py-0.5 text-[11px] font-mono bg-field/70 text-muted-foreground border-border/60 flex items-center gap-1 cursor-pointer hover:bg-field transition-colors"
+                title="Click to edit raid date"
+              >
+                <Calendar className="size-3 text-muted-foreground/80" />
+                {note.raidDate}
+              </Badge>
+            )}
+
+            {note.archived && (
+              <Badge
+                variant="outline"
+                className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+              >
+                Completed
+              </Badge>
+            )}
+
+            {/* Edit button in header */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleStartEdit}
+              className="size-7 text-muted-foreground opacity-60 hover:opacity-100 hover:text-primary transition-opacity"
+              title="Edit title, date & time"
+              aria-label="Edit title, date & time"
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+
+            {/* Pin toggle */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleTogglePin}
+              className={cn(
+                "size-7 transition-opacity ml-0.5",
+                note.pinned
+                  ? "text-amber-400 fill-amber-400 opacity-100"
+                  : "text-muted-foreground opacity-60 hover:opacity-100 hover:text-amber-400"
+              )}
+              title={note.pinned ? "Unpin note" : "Pin note"}
+            >
+              {note.pinned ? <Pin className="size-3.5 fill-amber-400" /> : <PinOff className="size-3.5" />}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Progress Bar (if items exist) */}
       {totalItems > 0 && (
@@ -361,8 +482,21 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
           <span>{copied ? "Copied" : "Copy list"}</span>
         </Button>
 
-        {/* Right actions: Color, Archive, Delete */}
+        {/* Right actions: Edit, Color, Archive, Delete */}
         <div className="flex items-center gap-1">
+          {/* Edit details */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleStartEdit}
+            className="size-7 hover:text-primary text-muted-foreground"
+            title="Edit title, date & time"
+            aria-label="Edit details"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+
           {/* Color dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
