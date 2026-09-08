@@ -55,7 +55,7 @@ Role groups:
 - Planning: `.agents/architect.md`, `.agents/api-designer.md`, and `.agents/planner.md`; read-only.
 - Investigation: `.agents/bug-investigator.md`; read-only.
 - Implementation: `.agents/backend-implementer.md` and `.agents/test-writer.md`; write-capable.
-- Review: `.agents/security-reviewer.md`, `.agents/refactor-reviewer.md`, and `.agents/performance-reviewer.md`; read-only.
+- Review: `.agents/code-reviewer.md`, `.agents/security-reviewer.md`, `.agents/refactor-reviewer.md`, and `.agents/performance-reviewer.md`; read-only.
 - Documentation: `.agents/docs-writer.md`; write-capable only when the workflow explicitly requests documentation changes.
 
 Some preserved role prompts use older names such as `JAWS_web`/`JAWS_api`, prescribe `src/__tests__`, or mention missing size thresholds. Treat those as stale examples. This file and the active `.workflows/` playbooks are authoritative: the current boundaries are React -> `src/api.js` -> `server.js`, Node tests belong in `test/*.test.js`, and UI tests are colocated `*.test.jsx` files.
