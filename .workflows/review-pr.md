@@ -9,7 +9,8 @@ This is a read-only workflow. Do not implement fixes unless the user separately 
 ## Sequence
 
 1. Establish the exact review scope and comparison base. If a reliable Git diff is unavailable, state that limitation and review only explicitly supplied files or patches.
-2. For a non-trivial diff, run independent read-only review agents in parallel when useful:
+2. For a PR or diff, use `.agents/code-reviewer.md` for a comprehensive single-pass review, or run specialized read-only review agents in parallel when deep isolation is needed:
+   - `.agents/code-reviewer.md` for unified review (domain accounting invariants, architecture boundaries, security, state, and test gaps).
    - `.agents/security-reviewer.md` for authorization, sessions, input handling, exports, and data exposure.
    - `.agents/refactor-reviewer.md` for correctness risks hidden by responsibility or dependency problems.
    - `.agents/test-writer.md` in review-only mode for missing behavior and failure-path coverage; do not allow it to edit.

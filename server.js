@@ -89,15 +89,63 @@ const DISCORD_ADMIN_ROLE_IDS = parseIdList(process.env.DISCORD_ADMIN_ROLE_IDS);
 const DISCORD_BOOSTER_ROLE_IDS = parseIdList(process.env.DISCORD_BOOSTER_ROLE_IDS);
 const sessions = new Map();
 const oauthStates = new Map();
+let ledgerVersion = 1;
 
-// Periodic pruning of in-memory and database sessions
+export function incrementLedgerVersion() {
+  ledgerVersion += 1;
+}
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[CRITICAL] Unhandled Promise Rejection:", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[CRITICAL] Uncaught Exception:", error);
+});
+
+// Periodic pruning of in-memory and database sessions with crash guard
 setInterval(() => {
-  pruneExpiredSessions();
+  pruneExpiredSessions().catch((err) => {
+    console.error("[CRON ERROR] Session pruning failed:", err.message);
+  });
   const now = Date.now();
   for (const [id, session] of sessions.entries()) {
     if (now > Number(session.expiresAt || 0)) sessions.delete(id);
   }
 }, 15 * 60 * 1000).unref();
+
+// In-memory sliding-window rate limiting
+const rateLimitBuckets = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_AUTH = 30;
+const RATE_LIMIT_MAX_MUTATIONS = 120;
+
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (forwarded) return String(forwarded).split(",")[0].trim();
+  return req.socket?.remoteAddress || "127.0.0.1";
+}
+
+function checkRateLimit(ip, category, maxRequests) {
+  const key = `${category}:${ip}`;
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key) || [];
+  const active = bucket.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
+  if (active.length >= maxRequests) {
+    return false;
+  }
+  active.push(now);
+  rateLimitBuckets.set(key, active);
+  return true;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamps] of rateLimitBuckets.entries()) {
+    const fresh = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (fresh.length === 0) rateLimitBuckets.delete(key);
+    else rateLimitBuckets.set(key, fresh);
+  }
+}, 5 * 60 * 1000).unref();
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -259,9 +307,12 @@ async function readJson(req) {
   return JSON.parse(body);
 }
 
-function sendJson(res, status, payload) {
+function sendJson(res, status, payload, etag = null) {
   setSecurityHeaders(res);
   res.setHeader("Cache-Control", "no-store");
+  if (etag) {
+    res.setHeader("ETag", `"${etag}"`);
+  }
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
@@ -287,7 +338,9 @@ function requireCsrf(req, res, session) {
     notAllowed(res, "Sign in with Discord before saving changes.");
     return false;
   }
-  if (req.headers["x-csrf-token"] !== session.csrfToken) {
+  const clientToken = Buffer.from(String(req.headers["x-csrf-token"] || ""));
+  const sessionToken = Buffer.from(String(session.csrfToken || ""));
+  if (clientToken.length === 0 || clientToken.length !== sessionToken.length || !timingSafeEqual(clientToken, sessionToken)) {
     sendJson(res, 403, { error: "Your session changed. Refresh the page, then try again." });
     return false;
   }
@@ -306,6 +359,24 @@ function publicUser(session) {
 
 async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
+
+  if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+    const ip = getClientIp(req);
+    if (!checkRateLimit(ip, "mutation", RATE_LIMIT_MAX_MUTATIONS)) {
+      return sendJson(res, 429, { error: "Too many requests. Please slow down and try again shortly." });
+    }
+  }
+
+  if (req.method === "GET" && req.headers["if-none-match"] === `"${ledgerVersion}"`) {
+    if (["/api/supplier-records", "/api/booster-records", "/api/external-expenses", "/api/raid-notes"].includes(pathname)) {
+      setSecurityHeaders(res);
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("ETag", `"${ledgerVersion}"`);
+      res.writeHead(304);
+      return res.end();
+    }
+  }
+
   const session = await getSession(req);
 
   if (pathname === "/api/config" && req.method === "GET") {
@@ -331,7 +402,7 @@ async function handleApi(req, res, url) {
   if (pathname === "/api/supplier-records" && req.method === "GET") {
     if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can view the sales ledger.");
     const payload = await getSupplierRecordsPayload();
-    return sendJson(res, 200, payload);
+    return sendJson(res, 200, payload, ledgerVersion);
   }
 
   if (pathname === "/api/profit-report" && req.method === "GET") {
@@ -386,6 +457,7 @@ async function handleApi(req, res, url) {
     };
 
     await insertSupplierRecord(record);
+    incrementLedgerVersion();
     const { summary } = await getSupplierRecordsPayload();
     return sendJson(res, 201, { record, summary });
   }
@@ -400,6 +472,7 @@ async function handleApi(req, res, url) {
 
     const result = await verifyAllSupplierRecords(selectedIds);
     if (result.error) return sendJson(res, 400, { error: result.error });
+    incrementLedgerVersion();
 
     const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { verifiedCount: result.verifiedCount, records, paidRecords, summary, withdrawals });
@@ -415,6 +488,7 @@ async function handleApi(req, res, url) {
 
     const result = await unverifyAllSupplierRecords(selectedIds);
     if (result.error) return sendJson(res, 400, { error: result.error });
+    incrementLedgerVersion();
 
     const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { unverifiedCount: result.unverifiedCount, records, paidRecords, summary, withdrawals });
@@ -431,6 +505,7 @@ async function handleApi(req, res, url) {
 
     const result = await markSupplierRecordsPaid(selectedIds, session, { settleWithdrawals });
     if (result.error) return sendJson(res, 400, { error: result.error });
+    incrementLedgerVersion();
 
     const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { paidCount: result.paidCount, paymentBatchId: result.paymentBatchId, records, paidRecords, summary, withdrawals });
@@ -444,6 +519,7 @@ async function handleApi(req, res, url) {
 
     const result = await reopenSupplierPaymentBatch(paymentBatchId, session);
     if (result.error) return sendJson(res, 404, { error: result.error });
+    incrementLedgerVersion();
 
     const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { reopenedCount: result.reopenedCount, records, paidRecords, summary, withdrawals });
@@ -452,7 +528,7 @@ async function handleApi(req, res, url) {
   if (pathname === "/api/supplier-withdrawals" && req.method === "GET") {
     if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can view supplier withdrawals.");
     const payload = await getSupplierWithdrawalsPayload();
-    return sendJson(res, 200, payload);
+    return sendJson(res, 200, payload, ledgerVersion);
   }
 
   if (pathname === "/api/supplier-withdrawals" && req.method === "POST") {
@@ -486,6 +562,7 @@ async function handleApi(req, res, url) {
     };
 
     await insertSupplierWithdrawal(withdrawal);
+    incrementLedgerVersion();
     const { withdrawals } = await getSupplierWithdrawalsPayload();
     return sendJson(res, 201, { withdrawal, withdrawals });
   }
@@ -522,6 +599,7 @@ async function handleApi(req, res, url) {
     if ("note" in body) updates.note = String(body.note || "").trim();
 
     const updated = await updateSupplierWithdrawal(id, updates);
+    incrementLedgerVersion();
     const { withdrawals } = await getSupplierWithdrawalsPayload();
     return sendJson(res, 200, { withdrawal: updated, withdrawals });
   }
@@ -534,6 +612,7 @@ async function handleApi(req, res, url) {
     if (!existing) return sendJson(res, 404, { error: "Withdrawal record not found." });
 
     await deleteSupplierWithdrawal(id);
+    incrementLedgerVersion();
     const { withdrawals } = await getSupplierWithdrawalsPayload();
     return sendJson(res, 200, { deletedId: id, withdrawals });
   }
@@ -593,6 +672,7 @@ async function handleApi(req, res, url) {
     const updated = await updateSupplierRecord(id, updates);
     if (!updated) return sendJson(res, 404, { error: "Sales record not found." });
 
+    incrementLedgerVersion();
     const { summary } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { record: updated, summary });
   }
@@ -603,6 +683,7 @@ async function handleApi(req, res, url) {
     const id = pathname.split("/").pop();
     const record = await deleteSupplierRecord(id);
     if (!record) return sendJson(res, 404, { error: "Sales record not found." });
+    incrementLedgerVersion();
     const { summary } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { record, summary });
   }
@@ -612,7 +693,7 @@ async function handleApi(req, res, url) {
     const payload = await getBoosterRecordsPayload(session, canManageAdmin(session));
     const { adjustments } = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
     const { vaultTransactions } = await getBoosterCashVaultPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, { ...payload, adjustments, vaultTransactions });
+    return sendJson(res, 200, { ...payload, adjustments, vaultTransactions }, ledgerVersion);
   }
 
   if (pathname === "/api/booster-records" && req.method === "POST") {
@@ -622,6 +703,7 @@ async function handleApi(req, res, url) {
     if (!body.level || !body.quantity) return sendJson(res, 400, { error: "Mythic+ key level and run count are required." });
     const quantity = Number(body.quantity);
     if (!Number.isInteger(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be a whole number greater than 0." });
+    if (!canManageAdmin(session) && quantity > 50) return sendJson(res, 400, { error: "Quantity cannot exceed 50 runs per entry." });
     const level = String(body.level || "").trim();
     const prices = await getBoosterPricesList();
     if (!prices.some((price) => price.active !== false && price.level === level)) return sendJson(res, 400, { error: "Choose an active Mythic+ key level." });
@@ -668,6 +750,7 @@ async function handleApi(req, res, url) {
     };
 
     await insertBoosterRecord(record);
+    incrementLedgerVersion();
     return sendJson(res, 201, { record });
   }
 
@@ -682,6 +765,7 @@ async function handleApi(req, res, url) {
 
     const result = await markBoosterRecordsPaid(selectedIds, session);
     if (result.error) return sendJson(res, 400, { error: result.error });
+    incrementLedgerVersion();
 
     const { records, summary } = await getBoosterRecordsPayload(session, true);
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
@@ -711,6 +795,7 @@ async function handleApi(req, res, url) {
 
     const result = await settleBoosterBalance({ discordId, boosterName }, session, { rate, action, date, note });
     if (result.error) return sendJson(res, 400, { error: result.error });
+    incrementLedgerVersion();
 
     const { records, summary } = await getBoosterRecordsPayload(session, true);
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
@@ -733,7 +818,7 @@ async function handleApi(req, res, url) {
   if (pathname === "/api/booster-cash-vault" && req.method === "GET") {
     if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view vault records.");
     const payload = await getBoosterCashVaultPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, payload);
+    return sendJson(res, 200, payload, ledgerVersion);
   }
 
   if (pathname === "/api/booster-cash-vault/withdraw" && req.method === "POST") {
@@ -742,6 +827,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const result = await withdrawBoosterVaultCash(body, session);
     if (result.error) return sendJson(res, 400, { error: result.error });
+    incrementLedgerVersion();
 
     const { vaultTransactions } = await getBoosterCashVaultPayload(session, true);
     return sendJson(res, 200, { ...result, vaultTransactions });
@@ -791,6 +877,7 @@ async function handleApi(req, res, url) {
     if ("quantity" in body) {
       const quantity = Number(body.quantity);
       if (!Number.isInteger(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Runs completed must be a whole number greater than 0." });
+      if (!canManageAdmin(session) && quantity > 50) return sendJson(res, 400, { error: "Quantity cannot exceed 50 runs per entry." });
       updates.quantity = quantity;
     }
     if ("createdAt" in body) {
@@ -811,6 +898,7 @@ async function handleApi(req, res, url) {
     if ("note" in body) updates.note = String(body.note || "").trim();
 
     const updated = await updateBoosterRecord(id, updates);
+    incrementLedgerVersion();
     return sendJson(res, 200, { record: updated });
   }
 
@@ -822,13 +910,14 @@ async function handleApi(req, res, url) {
     if (!record) return sendJson(res, 404, { error: "Payout row not found." });
     if (!canDeleteBoosterRecord(session, record)) return notAllowed(res, "Boosters can only delete their own payout rows.");
     await deleteBoosterRecord(id);
+    incrementLedgerVersion();
     return sendJson(res, 200, { record });
   }
 
   if (pathname === "/api/booster-adjustments" && req.method === "GET") {
     if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view adjustments.");
     const payload = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, payload);
+    return sendJson(res, 200, payload, ledgerVersion);
   }
 
   if (pathname === "/api/booster-adjustments" && req.method === "POST") {
@@ -862,6 +951,7 @@ async function handleApi(req, res, url) {
     };
 
     await insertBoosterAdjustment(adjustment);
+    incrementLedgerVersion();
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
     return sendJson(res, 201, { adjustment, adjustments });
   }
@@ -897,6 +987,7 @@ async function handleApi(req, res, url) {
     }
 
     const updated = await updateBoosterAdjustment(id, updates);
+    incrementLedgerVersion();
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
     return sendJson(res, 200, { adjustment: updated, adjustments });
   }
@@ -909,6 +1000,7 @@ async function handleApi(req, res, url) {
     if (!existing) return sendJson(res, 404, { error: "Adjustment not found." });
 
     await deleteBoosterAdjustment(id);
+    incrementLedgerVersion();
     const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
     return sendJson(res, 200, { deletedId: id, adjustments });
   }
@@ -919,6 +1011,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const cleaned = cleanPriceRows(body.rows, "type");
     const supplierServices = await updateSupplierServices(cleaned);
+    incrementLedgerVersion();
     const { summary } = await getSupplierRecordsPayload();
     return sendJson(res, 200, { supplierServices, summary });
   }
@@ -929,6 +1022,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const cleaned = cleanPriceRows(body.rows, "level");
     const boosterPrices = await updateBoosterPrices(cleaned);
+    incrementLedgerVersion();
     return sendJson(res, 200, { boosterPrices });
   }
 
@@ -938,6 +1032,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const cleaned = cleanGuildRows(body.rows);
     const supplierGuilds = await updateSupplierGuilds(cleaned);
+    incrementLedgerVersion();
     return sendJson(res, 200, { supplierGuilds });
   }
 
@@ -947,13 +1042,14 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const cleaned = cleanArmorRows(body.rows);
     const armorTypes = await updateArmorTypes(cleaned);
+    incrementLedgerVersion();
     return sendJson(res, 200, { armorTypes });
   }
 
   if (pathname === "/api/external-expenses" && req.method === "GET") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view external expenses.");
     const payload = await getExternalExpensesPayload();
-    return sendJson(res, 200, payload);
+    return sendJson(res, 200, payload, ledgerVersion);
   }
 
   if (pathname === "/api/external-expenses" && req.method === "POST") {
@@ -984,6 +1080,7 @@ async function handleApi(req, res, url) {
       recipient,
       note
     }, session);
+    incrementLedgerVersion();
     const payload = await getExternalExpensesPayload();
     return sendJson(res, 200, { expense: record, ...payload });
   }
@@ -1025,6 +1122,7 @@ async function handleApi(req, res, url) {
     }
 
     const updated = await updateExternalExpense(id, updates);
+    incrementLedgerVersion();
     const payload = await getExternalExpensesPayload();
     return sendJson(res, 200, { expense: updated, ...payload });
   }
@@ -1037,6 +1135,7 @@ async function handleApi(req, res, url) {
     if (!existing) return sendJson(res, 404, { error: "Expense not found." });
 
     await deleteExternalExpense(id);
+    incrementLedgerVersion();
     const payload = await getExternalExpensesPayload();
     return sendJson(res, 200, { deletedId: id, ...payload });
   }
@@ -1044,7 +1143,7 @@ async function handleApi(req, res, url) {
   if (pathname === "/api/raid-notes" && req.method === "GET") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view raid notes.");
     const payload = await getRaidNotesPayload();
-    return sendJson(res, 200, payload);
+    return sendJson(res, 200, payload, ledgerVersion);
   }
 
   if (pathname === "/api/raid-notes" && req.method === "POST") {
@@ -1068,6 +1167,7 @@ async function handleApi(req, res, url) {
       pinned,
       items
     }, session);
+    incrementLedgerVersion();
     const payload = await getRaidNotesPayload();
     return sendJson(res, 201, { note: record, ...payload });
   }
@@ -1098,6 +1198,7 @@ async function handleApi(req, res, url) {
     if ("items" in body && Array.isArray(body.items)) updates.items = body.items;
 
     const updated = await updateRaidNote(id, updates);
+    incrementLedgerVersion();
     const payload = await getRaidNotesPayload();
     return sendJson(res, 200, { note: updated, ...payload });
   }
@@ -1110,6 +1211,7 @@ async function handleApi(req, res, url) {
     if (!existing) return sendJson(res, 404, { error: "Raid note not found." });
 
     await deleteRaidNote(id);
+    incrementLedgerVersion();
     const payload = await getRaidNotesPayload();
     return sendJson(res, 200, { deletedId: id, ...payload });
   }
@@ -1189,6 +1291,10 @@ function cleanPriceRows(rows, key) {
 }
 
 async function handleDiscord(req, res, url) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(ip, "auth", RATE_LIMIT_MAX_AUTH)) {
+    return redirectWithAuthError(res, "Too many authentication requests. Please wait a minute and try again.");
+  }
   if (!discordReady()) return redirectWithAuthError(res, "Discord login is not configured yet. Add OAuth, server, and role IDs.");
 
   if (url.pathname === "/auth/discord") {
@@ -1339,6 +1445,10 @@ server.on("error", (error) => {
   throw error;
 });
 
-server.listen(PORT, () => {
-  console.log(`WoW Ledger running at http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  server.listen(PORT, () => {
+    console.log(`WoW Ledger running at http://localhost:${PORT}`);
+  });
+}
+
+export { server };

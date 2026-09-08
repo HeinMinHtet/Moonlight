@@ -335,15 +335,20 @@ test("markSupplierRecordsPaid partial withdrawal offset splits non-destructively
   const reopenRes = await reopenSupplierPaymentBatch(batchId, session);
   assert.equal(reopenRes.reopenedCount, 1);
 
-  // Check that the original 600 portion is now unsettled
+  // Check that the original withdrawal has been restored to 1000 and is now unsettled
   const wReopened = await getSupplierWithdrawalById(withdrawal.id);
   assert.equal(wReopened.settled, false);
   assert.equal(wReopened.settlementBatchId, null);
+  assert.equal(wReopened.amount, 1000);
+
+  // Check that the split remainder has been cleanly recombined and deleted
+  const payloadAfterReopen = await getSupplierWithdrawalsPayload();
+  const remainderAfterReopen = payloadAfterReopen.withdrawals.find((w) => w.id === remainder.id);
+  assert.equal(remainderAfterReopen, undefined);
 
   // Cleanup
   await deleteSupplierRecord(sale.id);
   await deleteSupplierWithdrawal(withdrawal.id);
-  if (remainder) await deleteSupplierWithdrawal(remainder.id);
 });
 
 
