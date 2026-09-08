@@ -15,22 +15,24 @@ test("insertRaidSchedule, updateRaidSchedule, buyer assignment, and deleteRaidSc
   const created = await insertRaidSchedule({
     date: "2026-09-08",
     timeEst: "20:00",
-    raid: "Liberation of Undermine",
+    raid: "Venomous Abyss",
     difficulty: "Heroic",
     loot: "Unsaved",
     maxBuyers: 6,
     buyers: ["BuyerOne-Illidan", "BuyerTwo-Area52"],
     lead: "Hein / Team Alpha",
-    note: "Bring armor stack mail"
+    note: "Bring armor stack mail",
+    isFull: false
   }, dummySession);
 
   assert.ok(created.id);
   assert.equal(created.date, "2026-09-08");
   assert.equal(created.timeEst, "20:00");
-  assert.equal(created.raid, "Liberation of Undermine");
+  assert.equal(created.raid, "Venomous Abyss");
   assert.equal(created.difficulty, "Heroic");
   assert.equal(created.loot, "Unsaved");
   assert.equal(created.maxBuyers, 6);
+  assert.equal(created.isFull, false);
   assert.equal(created.buyers.length, 2);
   assert.equal(created.buyers[0], "BuyerOne-Illidan");
   assert.equal(created.lead, "Hein / Team Alpha");
@@ -40,18 +42,21 @@ test("insertRaidSchedule, updateRaidSchedule, buyer assignment, and deleteRaidSc
   const fetched = await getRaidScheduleById(created.id);
   assert.ok(fetched);
   assert.equal(fetched.id, created.id);
-  assert.equal(fetched.raid, "Liberation of Undermine");
+  assert.equal(fetched.raid, "Venomous Abyss");
+  assert.equal(fetched.isFull, false);
 
-  // 3. Update schedule (add buyer, change loot to Saved, edit maxBuyers)
+  // 3. Update schedule (add buyer, change loot to Saved, edit maxBuyers, set isFull to true)
   const updated = await updateRaidSchedule(created.id, {
     loot: "Saved",
     maxBuyers: 8,
+    isFull: true,
     buyers: [...fetched.buyers, "BuyerThree-Tichondrius"]
   });
 
   assert.ok(updated);
   assert.equal(updated.loot, "Saved");
   assert.equal(updated.maxBuyers, 8);
+  assert.equal(updated.isFull, true);
   assert.equal(updated.buyers.length, 3);
   assert.equal(updated.buyers[2], "BuyerThree-Tichondrius");
 
@@ -61,6 +66,7 @@ test("insertRaidSchedule, updateRaidSchedule, buyer assignment, and deleteRaidSc
   assert.ok(found);
   assert.equal(found.loot, "Saved");
   assert.equal(found.maxBuyers, 8);
+  assert.equal(found.isFull, true);
 
   // 5. Delete schedule
   const deleted = await deleteRaidSchedule(created.id);
@@ -70,22 +76,25 @@ test("insertRaidSchedule, updateRaidSchedule, buyer assignment, and deleteRaidSc
   assert.equal(afterDelete, null);
 });
 
-test("insertRaidSchedule validates and sanitizes difficulty, loot, and maxBuyers bounds", async () => {
+test("insertRaidSchedule validates and sanitizes difficulty, loot, and maxBuyers bounds, defaulting raid to Venomous Abyss", async () => {
   // Invalid difficulty falls back to 'Heroic'
   // Invalid loot falls back to 'Unsaved'
   // maxBuyers clamped between 1 and 30
+  // empty raid falls back to 'Venomous Abyss'
   const created = await insertRaidSchedule({
     date: "2026-09-09",
     timeEst: "22:00",
-    raid: "Nerub-ar Palace",
+    raid: "",
     difficulty: "InvalidDifficulty",
     loot: "UnknownLoot",
     maxBuyers: -5
   });
 
+  assert.equal(created.raid, "Venomous Abyss");
   assert.equal(created.difficulty, "Heroic");
   assert.equal(created.loot, "Unsaved");
   assert.equal(created.maxBuyers, 1);
+  assert.equal(created.isFull, false);
 
   await deleteRaidSchedule(created.id);
 });
