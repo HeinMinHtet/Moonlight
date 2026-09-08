@@ -97,5 +97,7 @@
       "paidByName": "ExampleAdmin",
       "boosterPaymentBatchId": "bpb_example_batch_001"
     }
-  ]
+  ],
+  "raidNotes": [],
+  "raidSchedules": []
 }

@@ -61,6 +61,7 @@ test("Server Gateway Integration Tests", async (t) => {
       "/api/profit-report?from=2026-01-01&to=2026-01-07",
       "/api/external-expenses",
       "/api/raid-notes",
+      "/api/raid-schedules",
       "/api/booster-records"
     ];
 
