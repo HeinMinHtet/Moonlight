@@ -54,6 +54,11 @@ import {
   getRaidNoteById,
   updateRaidNote,
   deleteRaidNote,
+  getRaidSchedulesPayload,
+  insertRaidSchedule,
+  getRaidScheduleById,
+  updateRaidSchedule,
+  deleteRaidSchedule,
   getProfitReportData,
   getSessionFromDb,
   saveSessionToDb,
@@ -293,7 +298,9 @@ function permissionsFor(session) {
     profitReport: canManageAdmin(session),
     priceSettings: canManageAdmin(session),
     externalExpenses: canManageAdmin(session),
-    raidNotes: canManageAdmin(session)
+    raidNotes: canManageAdmin(session),
+    raidSchedule: canManageAdmin(session) || canUseBooster(session),
+    raidScheduleEdit: canManageAdmin(session)
   };
 }
 
@@ -1213,6 +1220,90 @@ async function handleApi(req, res, url) {
     await deleteRaidNote(id);
     incrementLedgerVersion();
     const payload = await getRaidNotesPayload();
+    return sendJson(res, 200, { deletedId: id, ...payload });
+  }
+
+  if (pathname === "/api/raid-schedules" && req.method === "GET") {
+    if (!canManageAdmin(session) && !canUseBooster(session)) return notAllowed(res, "Sign in to view raid schedules.");
+    const payload = await getRaidSchedulesPayload();
+    return sendJson(res, 200, payload, ledgerVersion);
+  }
+
+  if (pathname === "/api/raid-schedules" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can schedule raid runs.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const raid = String(body.raid || "").trim();
+    if (!raid) return sendJson(res, 400, { error: "Raid name is required." });
+    const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
+    if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid date." });
+    const timeEst = String(body.timeEst || "").trim();
+    const difficulty = String(body.difficulty || "Heroic").trim();
+    const loot = String(body.loot || "Unsaved").trim();
+    const maxBuyers = Math.max(1, Math.min(30, parseInt(body.maxBuyers, 10) || 6));
+    const buyers = Array.isArray(body.buyers) ? body.buyers : [];
+    const lead = String(body.lead || "").trim();
+    const note = String(body.note || "").trim();
+
+    const record = await insertRaidSchedule({
+      date,
+      timeEst,
+      raid,
+      difficulty,
+      loot,
+      maxBuyers,
+      buyers,
+      lead,
+      note
+    }, session);
+    incrementLedgerVersion();
+    const payload = await getRaidSchedulesPayload();
+    return sendJson(res, 201, { schedule: record, ...payload });
+  }
+
+  if (pathname.startsWith("/api/raid-schedules/") && req.method === "PATCH") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update raid schedules.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getRaidScheduleById(id);
+    if (!existing) return sendJson(res, 404, { error: "Raid schedule not found." });
+
+    const body = await readJson(req);
+    const updates = {};
+    if ("raid" in body) {
+      const raid = String(body.raid || "").trim();
+      if (!raid) return sendJson(res, 400, { error: "Raid name cannot be empty." });
+      updates.raid = raid;
+    }
+    if ("date" in body) {
+      const date = String(body.date || "").trim();
+      if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid date." });
+      updates.date = date;
+    }
+    if ("timeEst" in body) updates.timeEst = String(body.timeEst || "").trim();
+    if ("difficulty" in body) updates.difficulty = String(body.difficulty || "").trim();
+    if ("loot" in body) updates.loot = String(body.loot || "").trim();
+    if ("maxBuyers" in body) updates.maxBuyers = Math.max(1, Math.min(30, parseInt(body.maxBuyers, 10) || 6));
+    if ("buyers" in body && Array.isArray(body.buyers)) updates.buyers = body.buyers;
+    if ("lead" in body) updates.lead = String(body.lead || "").trim();
+    if ("note" in body) updates.note = String(body.note || "").trim();
+
+    const updated = await updateRaidSchedule(id, updates);
+    incrementLedgerVersion();
+    const payload = await getRaidSchedulesPayload();
+    return sendJson(res, 200, { schedule: updated, ...payload });
+  }
+
+  if (pathname.startsWith("/api/raid-schedules/") && req.method === "DELETE") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete raid schedules.");
+    if (!requireCsrf(req, res, session)) return;
+    const id = pathname.split("/").pop();
+    const existing = await getRaidScheduleById(id);
+    if (!existing) return sendJson(res, 404, { error: "Raid schedule not found." });
+
+    await deleteRaidSchedule(id);
+    incrementLedgerVersion();
+    const payload = await getRaidSchedulesPayload();
     return sendJson(res, 200, { deletedId: id, ...payload });
   }
 

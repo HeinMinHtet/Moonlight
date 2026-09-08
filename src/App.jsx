@@ -10,10 +10,12 @@ import { RateSettingsPage } from "./components/rates/RateSettingsPage.jsx";
 import { SupplierPaidHistoryPage } from "./components/supplier/SupplierPaidHistoryPage.jsx";
 import { SupplierUnpaidPage } from "./components/supplier/SupplierUnpaidPage.jsx";
 import { RaidNotesPage } from "./components/notes/RaidNotesPage.jsx";
+import { RaidSchedulePage } from "./components/schedule/RaidSchedulePage.jsx";
 import { useSupplierActions } from "./hooks/useSupplierActions.js";
 import { useBoosterActions } from "./hooks/useBoosterActions.js";
 import { useExpenseAndNoteActions } from "./hooks/useExpenseAndNoteActions.js";
 import { useRateActions } from "./hooks/useRateActions.js";
+import { useRaidScheduleActions } from "./hooks/useRaidScheduleActions.js";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Button, buttonVariants } from "@/components/ui/button.jsx";
 import { Toaster } from "@/components/ui/sonner.jsx";
@@ -43,7 +45,8 @@ const initialState = {
   boosterAdjustments: [],
   boosterCashVault: [],
   externalExpenses: [],
-  raidNotes: []
+  raidNotes: [],
+  raidSchedules: []
 };
 
 export function App() {
@@ -76,7 +79,9 @@ export function App() {
     canEditPrices: Boolean(data.permissions.priceSettings),
     canMarkBoosterPaid: Boolean(data.permissions.boosterPaid),
     canDeleteBoosterRows: Boolean(data.permissions.boosterDelete),
-    canUseNotes: Boolean(data.permissions.raidNotes)
+    canUseNotes: Boolean(data.permissions.raidNotes),
+    canUseSchedule: Boolean(data.permissions.raidSchedule),
+    canEditSchedule: Boolean(data.permissions.raidScheduleEdit)
   };
 
   const showToast = useCallback((message) => {
@@ -150,6 +155,18 @@ export function App() {
     }));
   }, [data.permissions]);
 
+  const loadSchedules = useCallback(async (activePermissions = data.permissions) => {
+    if (!activePermissions.raidSchedule) {
+      setData((current) => ({ ...current, raidSchedules: [] }));
+      return;
+    }
+    const payload = await api("/api/raid-schedules");
+    setData((current) => ({
+      ...current,
+      raidSchedules: payload.schedules || []
+    }));
+  }, [data.permissions]);
+
   const pollVisibleData = useCallback(async () => {
     if (pollingRef.current || foregroundActionRef.current) return;
     pollingRef.current = true;
@@ -160,11 +177,13 @@ export function App() {
       const needsBoosters = config.permissions.boosterRecords && ["booster", "prices"].includes(activeTab);
       const needsExpenses = config.permissions.externalExpenses && ["expenses", "profit"].includes(activeTab);
       const needsNotes = config.permissions.raidNotes && activeTab === "notes";
-      const [supplierPayload, boosterPayload, expensesPayload, notesPayload] = await Promise.all([
+      const needsSchedule = config.permissions.raidSchedule && activeTab === "schedule";
+      const [supplierPayload, boosterPayload, expensesPayload, notesPayload, schedulesPayload] = await Promise.all([
         needsSupplier ? api("/api/supplier-records") : Promise.resolve(null),
         needsBoosters ? api("/api/booster-records") : Promise.resolve(null),
         needsExpenses ? api("/api/external-expenses") : Promise.resolve(null),
-        needsNotes ? api("/api/raid-notes") : Promise.resolve(null)
+        needsNotes ? api("/api/raid-notes") : Promise.resolve(null),
+        needsSchedule ? api("/api/raid-schedules") : Promise.resolve(null)
       ]);
 
       if (foregroundActionRef.current || dataVersionRef.current !== startedAtVersion) return;
@@ -206,7 +225,10 @@ export function App() {
             : config.permissions.externalExpenses ? current.externalExpenses : [],
           raidNotes: notesPayload
             ? (notesPayload.notes || [])
-            : config.permissions.raidNotes ? current.raidNotes : []
+            : config.permissions.raidNotes ? current.raidNotes : [],
+          raidSchedules: schedulesPayload
+            ? (schedulesPayload.schedules || [])
+            : config.permissions.raidSchedule ? current.raidSchedules : []
         };
       });
       if (activeTab === "profit" && config.user?.role === "admin") {
@@ -224,11 +246,12 @@ export function App() {
     setLoadError("");
     try {
       const config = await api("/api/config");
-      const [supplierPayload, boosterPayload, expensesPayload, notesPayload] = await Promise.all([
+      const [supplierPayload, boosterPayload, expensesPayload, notesPayload, schedulesPayload] = await Promise.all([
         config.permissions.supplierRecords ? api("/api/supplier-records") : Promise.resolve({ records: [], paidRecords: [], summary: [], withdrawals: [] }),
         config.permissions.boosterRecords ? api("/api/booster-records") : Promise.resolve({ records: [], summary: [], adjustments: [], vaultTransactions: [] }),
         config.permissions.externalExpenses ? api("/api/external-expenses") : Promise.resolve({ expenses: [] }),
-        config.permissions.raidNotes ? api("/api/raid-notes") : Promise.resolve({ notes: [] })
+        config.permissions.raidNotes ? api("/api/raid-notes") : Promise.resolve({ notes: [] }),
+        config.permissions.raidSchedule ? api("/api/raid-schedules") : Promise.resolve({ schedules: [] })
       ]);
       setData((current) => ({
         ...current,
@@ -242,7 +265,8 @@ export function App() {
         boosterAdjustments: boosterPayload.adjustments || [],
         boosterCashVault: boosterPayload.vaultTransactions || [],
         externalExpenses: expensesPayload.expenses || [],
-        raidNotes: notesPayload.notes || []
+        raidNotes: notesPayload.notes || [],
+        raidSchedules: schedulesPayload.schedules || []
       }));
       setActiveTab(config.user?.role === "admin" ? "supplier" : "booster");
     } catch (error) {
@@ -291,7 +315,7 @@ export function App() {
 
   useEffect(() => {
     if (isAdmin) return;
-    if (["supplier", "supplierHistory", "notes", "expenses", "profit", "prices", "calculator"].includes(activeTab)) setActiveTab("booster");
+    if (["supplier", "supplierHistory", "schedule", "notes", "expenses", "profit", "prices", "calculator"].includes(activeTab)) setActiveTab("booster");
   }, [activeTab, isAdmin]);
 
   const runAction = async (action) => {
@@ -322,12 +346,16 @@ export function App() {
     const todayNotesCount = (data.raidNotes || []).filter(
       (n) => !n.archived && n.raidDate === today
     ).length;
+    const todayScheduleCount = (data.raidSchedules || []).filter(
+      (s) => s.date === today
+    ).length;
     return {
       supplier: unverifiedSupplierCount,
       booster: boosterReviewCount,
-      notes: todayNotesCount
+      notes: todayNotesCount,
+      schedule: todayScheduleCount
     };
-  }, [data.supplierRecords, data.boosterRecords, data.raidNotes]);
+  }, [data.supplierRecords, data.boosterRecords, data.raidNotes, data.raidSchedules]);
 
   const supplierGrandTotal = useMemo(
     () => data.supplierSummary.reduce((sum, row) => sum + Number(row.totalCost || 0), 0),
@@ -409,6 +437,22 @@ export function App() {
     showToast,
     askConfirm,
     raidNotes: data.raidNotes
+  });
+
+  const {
+    submitRaidSchedule,
+    patchRaidSchedule,
+    deleteRaidSchedule,
+    addBuyerToSchedule,
+    removeBuyerFromSchedule
+  } = useRaidScheduleActions({
+    request,
+    runAction,
+    setData,
+    loadSchedules,
+    showToast,
+    askConfirm,
+    raidSchedules: data.raidSchedules
   });
 
   const {
@@ -529,6 +573,20 @@ export function App() {
             canReopen={permissions.canReopenSupplierPaid}
             onExportBatch={exportPaidSupplierBatch}
             onReopenBatch={reopenSupplierPaymentBatch}
+          />
+        )}
+
+        {activeTab === "schedule" && (
+          <RaidSchedulePage
+            isAdmin={isAdmin}
+            loading={loading}
+            loadError={loadError}
+            schedules={data.raidSchedules}
+            onSubmitSchedule={submitRaidSchedule}
+            onPatchSchedule={patchRaidSchedule}
+            onDeleteSchedule={deleteRaidSchedule}
+            onAddBuyer={addBuyerToSchedule}
+            onRemoveBuyer={removeBuyerFromSchedule}
           />
         )}
 
