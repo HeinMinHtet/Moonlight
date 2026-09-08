@@ -1244,6 +1244,7 @@ async function handleApi(req, res, url) {
     const buyers = Array.isArray(body.buyers) ? body.buyers : [];
     const lead = String(body.lead || "").trim();
     const note = String(body.note || "").trim();
+    const isFull = Boolean(body.isFull);
 
     const record = await insertRaidSchedule({
       date,
@@ -1254,7 +1255,8 @@ async function handleApi(req, res, url) {
       maxBuyers,
       buyers,
       lead,
-      note
+      note,
+      isFull
     }, session);
     incrementLedgerVersion();
     const payload = await getRaidSchedulesPayload();
@@ -1287,6 +1289,7 @@ async function handleApi(req, res, url) {
     if ("buyers" in body && Array.isArray(body.buyers)) updates.buyers = body.buyers;
     if ("lead" in body) updates.lead = String(body.lead || "").trim();
     if ("note" in body) updates.note = String(body.note || "").trim();
+    if ("isFull" in body) updates.isFull = Boolean(body.isFull);
 
     const updated = await updateRaidSchedule(id, updates);
     incrementLedgerVersion();

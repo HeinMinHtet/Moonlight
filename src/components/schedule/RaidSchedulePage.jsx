@@ -16,7 +16,8 @@ import {
   X,
   Swords,
   Lock,
-  Unlock
+  Unlock,
+  Pencil
 } from "lucide-react";
 import { Input } from "@/components/ui/input.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -26,11 +27,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { cn } from "@/lib/utils.js";
 import { toast as notify } from "sonner";
 
-// Default standard WoW raids in current season
+// Default Midnight Season 2 raids
 const DEFAULT_RAIDS = [
-  "Liberation of Undermine",
-  "Nerub-ar Palace",
-  "Blackrock Depths"
+  "Venomous Abyss",
+  "Tidebound Grotto"
 ];
 
 // Difficulty options
@@ -108,6 +108,7 @@ export function RaidSchedulePage({
   // Quick Add form state
   const [quickTime, setQuickTime] = useState("20:00");
   const [quickRaid, setQuickRaid] = useState(DEFAULT_RAIDS[0]);
+  const [quickCustomRaid, setQuickCustomRaid] = useState("");
   const [quickDifficulty, setQuickDifficulty] = useState("Heroic");
   const [quickLoot, setQuickLoot] = useState("Unsaved");
   const [quickMaxBuyers, setQuickMaxBuyers] = useState(6);
@@ -123,6 +124,9 @@ export function RaidSchedulePage({
   // Modal for managing 8/8 buyers
   const [activeBuyerModalRun, setActiveBuyerModalRun] = useState(null);
   const [newBuyerInput, setNewBuyerInput] = useState("");
+
+  // Modal for editing raid schedule run
+  const [editingRun, setEditingRun] = useState(null);
 
   const weekDays = useMemo(() => getLockoutWeekDays(weekOffset), [weekOffset]);
   const weekStart = weekDays[0];
@@ -157,8 +161,8 @@ export function RaidSchedulePage({
       // Loot
       if (filterLoot !== "All" && run.loot !== filterLoot) return false;
 
-      // Availability
-      const isFull = (run.buyers || []).length >= run.maxBuyers;
+      // Availability (considers both buyers count and manual isFull toggle)
+      const isFull = Boolean(run.isFull) || (run.buyers || []).length >= run.maxBuyers;
       if (filterAvailability === "Open" && isFull) return false;
       if (filterAvailability === "Full" && !isFull) return false;
 
@@ -209,56 +213,58 @@ export function RaidSchedulePage({
     if (!isAdmin) return;
 
     const targetDate = showEntireWeek ? (selectedDay === "all" ? weekStart.dateStr : selectedDay) : selectedDay;
+    const resolvedRaid = quickRaid === "Custom" ? (quickCustomRaid.trim() || DEFAULT_RAIDS[0]) : quickRaid;
 
     await onSubmitSchedule({
       date: targetDate,
       timeEst: quickTime,
-      raid: quickRaid,
+      raid: resolvedRaid,
       difficulty: quickDifficulty,
       loot: quickLoot,
       maxBuyers: Number(quickMaxBuyers) || 6,
       lead: quickLead,
       note: quickNote,
-      buyers: []
+      buyers: [],
+      isFull: false
     });
   };
 
-  // Copy for Discord
-  const handleCopyDiscord = () => {
-    let text = `📅 **MOONLIGHT RAID SCHEDULE (${weekRangeLabel})**\n\n`;
+  // Copy schedule formatted cleanly for WeChat - selected date only, without "Moonlight"
+  const handleCopySchedule = () => {
+    const targetDate = selectedDay === "all" ? (weekDays[0]?.dateStr || new Date().toISOString().slice(0, 10)) : selectedDay;
+    const dateRuns = schedules
+      .filter((run) => run.date === targetDate)
+      .sort((a, b) => (a.timeEst || "").localeCompare(b.timeEst || ""));
 
-    const grouped = new Map();
-    for (const d of weekDays) grouped.set(d.dateStr, []);
-    for (const run of filteredSchedules) {
-      if (!grouped.has(run.date)) grouped.set(run.date, []);
-      grouped.get(run.date).push(run);
-    }
+    let text = `📅 团本安排 Raid Schedule (${targetDate})\n`;
+    text += `─────────────────────────\n`;
 
-    let hasAnyRuns = false;
-    for (const [dateStr, runs] of grouped.entries()) {
-      if (runs.length > 0) {
-        hasAnyRuns = true;
-        const dObj = weekDays.find((d) => d.dateStr === dateStr);
-        const dayTitle = dObj ? `${dObj.dayShort.toUpperCase()} (${dateStr})` : dateStr;
-        text += `**${dayTitle}:**\n`;
+    if (dateRuns.length === 0) {
+      text += `暂无团本安排 (No raids scheduled for this date).\n`;
+    } else {
+      for (const r of dateRuns) {
+        const booked = (r.buyers || []).length;
+        const maxCap = Number(r.maxBuyers || 6);
+        const isFull = Boolean(r.isFull) || booked >= maxCap;
+        const openSpots = Math.max(0, maxCap - booked);
+        const displayTime = formatDisplayTime(r.timeEst);
+        const statusText = isFull ? `[已满 FULL]` : `(剩余 ${openSpots} 坑 / ${openSpots} open)`;
 
-        for (const r of runs) {
-          const booked = (r.buyers || []).length;
-          const open = Math.max(0, r.maxBuyers - booked);
-          const spotInfo = open > 0 ? `(${open} spots open)` : `🔴 FULL`;
-          const displayTime = formatDisplayTime(r.timeEst);
-          text += `• \`${displayTime}\` - **${r.difficulty} ${r.raid}** [${r.loot}] - 8/8 Cap: ${booked}/${r.maxBuyers} ${spotInfo}\n`;
+        text += `• ${displayTime} | ${r.difficulty} ${r.raid} [${r.loot}]\n`;
+        text += `  8/8坑位: ${booked}/${maxCap} ${statusText}\n`;
+        if (r.lead) {
+          text += `  团长: ${r.lead}\n`;
+        }
+        if (r.note) {
+          text += `  备注: ${r.note}\n`;
         }
         text += `\n`;
       }
     }
+    text += `─────────────────────────`;
 
-    if (!hasAnyRuns) {
-      text += `_No raids currently scheduled for this period._\n`;
-    }
-
-    navigator.clipboard.writeText(text);
-    notify("Copied Discord schedule announcement to clipboard!");
+    navigator.clipboard.writeText(text.trim());
+    notify("Copied raid schedule to clipboard!");
   };
 
   // Buyer modal actions
@@ -311,12 +317,12 @@ export function RaidSchedulePage({
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleCopyDiscord}
+            onClick={handleCopySchedule}
             className="text-xs gap-1.5 border-border bg-card hover:bg-secondary"
-            title="Copy schedule formatted for Discord announcements"
+            title="Copy raid schedule for selected date (WeChat format)"
           >
-            <Copy className="size-3.5 text-indigo-400" />
-            <span>Copy for Discord</span>
+            <Copy className="size-3.5 text-emerald-400" />
+            <span>Copy raid schedule</span>
           </Button>
 
           <Button
@@ -538,7 +544,17 @@ export function RaidSchedulePage({
                     {r}
                   </option>
                 ))}
+                <option value="Custom">Custom...</option>
               </select>
+              {quickRaid === "Custom" && (
+                <Input
+                  placeholder="Custom raid name"
+                  value={quickCustomRaid}
+                  onChange={(e) => setQuickCustomRaid(e.target.value)}
+                  className="h-8 text-xs bg-field mt-1.5"
+                  required
+                />
+              )}
             </div>
 
             {/* Difficulty */}
@@ -710,6 +726,7 @@ export function RaidSchedulePage({
                   <th className="py-3 px-4">Difficulty</th>
                   <th className="py-3 px-4">Loot</th>
                   <th className="py-3 px-4">Maximum 8/8 (Cap)</th>
+                  <th className="py-3 px-4 text-center">Full</th>
                   <th className="py-3 px-4">Lead / Team</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -718,7 +735,7 @@ export function RaidSchedulePage({
                 {filteredSchedules.map((run) => {
                   const booked = (run.buyers || []).length;
                   const maxCap = Number(run.maxBuyers || 6);
-                  const isFull = booked >= maxCap;
+                  const isFull = Boolean(run.isFull) || booked >= maxCap;
                   const openSpots = Math.max(0, maxCap - booked);
                   const pct = Math.min(100, Math.round((booked / maxCap) * 100));
 
@@ -817,6 +834,40 @@ export function RaidSchedulePage({
                         </div>
                       </td>
 
+                      {/* Full Checkbox Column */}
+                      <td className="py-3 px-4 whitespace-nowrap text-center">
+                        {isAdmin ? (
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(run.isFull)}
+                              onChange={(e) => onPatchSchedule(run.id, { isFull: e.target.checked })}
+                              className="size-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
+                              aria-label={`Toggle full status for ${run.difficulty} ${run.raid}`}
+                            />
+                            <span
+                              className={cn(
+                                "text-[11px] font-semibold",
+                                run.isFull ? "text-rose-400 font-bold" : "text-muted-foreground"
+                              )}
+                            >
+                              {run.isFull ? "Full" : "Open"}
+                            </span>
+                          </label>
+                        ) : (
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                              run.isFull
+                                ? "bg-rose-500/15 text-rose-300 border border-rose-500/30 font-bold"
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            {run.isFull ? "Full" : "Open"}
+                          </span>
+                        )}
+                      </td>
+
                       {/* Lead */}
                       <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">
                         {run.lead || "Unassigned"}
@@ -837,17 +888,32 @@ export function RaidSchedulePage({
                           </Button>
 
                           {isAdmin && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => onDeleteSchedule(run)}
-                              className="size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              title="Delete raid run"
-                              aria-label="Delete run"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingRun(run)}
+                                className="h-7 text-[11px] gap-1 px-2 border-border hover:text-primary hover:border-primary/40"
+                                title="Edit raid run"
+                                aria-label="Edit run"
+                              >
+                                <Pencil className="size-3" />
+                                <span>Edit</span>
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onDeleteSchedule(run)}
+                                className="size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                title="Delete raid run"
+                                aria-label="Delete run"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -978,6 +1044,254 @@ export function RaidSchedulePage({
           </div>
         </div>
       )}
+
+      {/* 7. Edit Raid Schedule Modal */}
+      {editingRun && (
+        <EditScheduleModal
+          run={editingRun}
+          onClose={() => setEditingRun(null)}
+          onSave={async (id, updates) => {
+            await onPatchSchedule(id, updates);
+            setEditingRun(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditScheduleModal({ run, onClose, onSave }) {
+  const [date, setDate] = useState(run.date || "");
+  const [timeEst, setTimeEst] = useState(run.timeEst || "");
+  const [raid, setRaid] = useState(() => (DEFAULT_RAIDS.includes(run.raid) ? run.raid : "Custom"));
+  const [customRaid, setCustomRaid] = useState(() => (DEFAULT_RAIDS.includes(run.raid) ? "" : run.raid || ""));
+  const [difficulty, setDifficulty] = useState(run.difficulty || "Heroic");
+  const [loot, setLoot] = useState(run.loot || "Unsaved");
+  const [maxBuyers, setMaxBuyers] = useState(run.maxBuyers || 6);
+  const [isFull, setIsFull] = useState(Boolean(run.isFull));
+  const [lead, setLead] = useState(run.lead || "");
+  const [note, setNote] = useState(run.note || "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    const resolvedRaid = raid === "Custom" ? (customRaid.trim() || DEFAULT_RAIDS[0]) : raid;
+    try {
+      await onSave(run.id, {
+        date,
+        timeEst,
+        raid: resolvedRaid,
+        difficulty,
+        loot,
+        maxBuyers: Math.max(1, Math.min(30, parseInt(maxBuyers, 10) || 6)),
+        isFull,
+        lead: lead.trim(),
+        note: note.trim()
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="rounded-xl border border-border bg-card w-full max-w-lg p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Pencil className="size-4 text-primary" />
+              Edit Raid Schedule
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Modify schedule details, capacity, and status for this run.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="size-7 text-muted-foreground hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Date */}
+            <div>
+              <label htmlFor="edit-date-input" className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Date
+              </label>
+              <Input
+                id="edit-date-input"
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-8 text-xs bg-field"
+              />
+            </div>
+
+            {/* Time EST */}
+            <div>
+              <label htmlFor="edit-time-input" className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Time (EST)
+              </label>
+              <Input
+                id="edit-time-input"
+                type="time"
+                required
+                value={timeEst}
+                onChange={(e) => setTimeEst(e.target.value)}
+                className="h-8 text-xs font-mono bg-field"
+              />
+            </div>
+
+            {/* Raid */}
+            <div className={raid === "Custom" ? "sm:col-span-2" : ""}>
+              <label htmlFor="edit-raid-select" className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Raid Instance
+              </label>
+              <div className="space-y-1.5">
+                <select
+                  id="edit-raid-select"
+                  value={raid}
+                  onChange={(e) => setRaid(e.target.value)}
+                  className="w-full h-8 text-xs rounded-md border border-border bg-field px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {DEFAULT_RAIDS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                  <option value="Custom">Custom / Other Raid...</option>
+                </select>
+                {raid === "Custom" && (
+                  <Input
+                    placeholder="Enter custom raid name"
+                    value={customRaid}
+                    onChange={(e) => setCustomRaid(e.target.value)}
+                    className="h-8 text-xs bg-field"
+                    required
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Difficulty */}
+            <div>
+              <label htmlFor="edit-difficulty-select" className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Difficulty
+              </label>
+              <select
+                id="edit-difficulty-select"
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                className="w-full h-8 text-xs rounded-md border border-border bg-field px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {DIFFICULTIES.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Loot */}
+            <div>
+              <label htmlFor="edit-loot-select" className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Loot
+              </label>
+              <select
+                id="edit-loot-select"
+                value={loot}
+                onChange={(e) => setLoot(e.target.value)}
+                className="w-full h-8 text-xs rounded-md border border-border bg-field px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {LOOT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.short}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Maximum 8/8 */}
+            <div>
+              <label htmlFor="edit-max-buyers-input" className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Maximum 8/8 Buyers
+              </label>
+              <Input
+                id="edit-max-buyers-input"
+                type="number"
+                min="1"
+                max="30"
+                required
+                value={maxBuyers}
+                onChange={(e) => setMaxBuyers(e.target.value)}
+                className="h-8 text-xs font-mono bg-field"
+              />
+            </div>
+
+            {/* Raid Full Checkbox */}
+            <div className="flex items-center pt-5">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isFull}
+                  onChange={(e) => setIsFull(e.target.checked)}
+                  className="size-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-foreground">
+                  Mark Raid as Full
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Lead */}
+          <div>
+            <label htmlFor="edit-lead-input" className="block text-[11px] font-medium text-muted-foreground mb-1">
+              Lead / Team
+            </label>
+            <Input
+              id="edit-lead-input"
+              placeholder="e.g. Hein / Team Alpha"
+              value={lead}
+              onChange={(e) => setLead(e.target.value)}
+              className="h-8 text-xs bg-field"
+            />
+          </div>
+
+          {/* Note */}
+          <div>
+            <label htmlFor="edit-note-input" className="block text-[11px] font-medium text-muted-foreground mb-1">
+              Raid Note
+            </label>
+            <Input
+              id="edit-note-input"
+              placeholder="e.g. Mail stack, bring potions"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="h-8 text-xs bg-field"
+            />
+          </div>
+
+          {/* Dialog Actions */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={saving} className="text-xs font-bold">
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
