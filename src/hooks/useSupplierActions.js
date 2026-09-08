@@ -121,18 +121,20 @@ export function useSupplierActions({
     batchRows = verifiedUnpaidSupplierRows,
     batchSummary = supplierSummary,
     batchTotal = supplierGrandTotal,
-    withdrawals = supplierWithdrawals
+    withdrawals = supplierWithdrawals,
+    options = {}
   ) => runAction(async () => {
     if (!batchRows.length) return showToast("No verified unpaid sales to export.");
     const activeWithdrawals = (withdrawals || []).filter((w) => !w.settled && Number(w.amount || 0) > 0);
     await exportSupplierReport(batchRows, batchSummary, batchTotal, {
       withdrawals: activeWithdrawals,
-      totalLabel: "FINAL SETTLED AMOUNT"
+      totalLabel: "FINAL SETTLED AMOUNT",
+      ...options
     });
     showToast("Supplier report exported.");
   });
 
-  const exportPaidSupplierBatch = (batch) => runAction(async () => {
+  const exportPaidSupplierBatch = (batch, options = {}) => runAction(async () => {
     if (!batch?.records?.length) return showToast("This paid batch has no records to export.");
     const summary = buildSupplierSummary(batch.records, { includePaid: true });
     const batchWithdrawals = (supplierWithdrawals || []).filter(
@@ -142,7 +144,8 @@ export function useSupplierActions({
       title: "Paid Supplier Batch",
       totalLabel: "FINAL SETTLED AMOUNT",
       batchLabel: `Batch ${batch.id}`,
-      withdrawals: batchWithdrawals
+      withdrawals: batchWithdrawals,
+      ...options
     });
     showToast("Paid batch exported.");
   });

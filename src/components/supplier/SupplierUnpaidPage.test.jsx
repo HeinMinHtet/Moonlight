@@ -214,7 +214,7 @@ describe("SupplierUnpaidPage", () => {
     expect(onUnverifyAll.mock.calls[0][0]).toEqual([verifiedRecord]);
   });
 
-  it("opens the export dialog and performs instant export or date range export", async () => {
+  it("opens the export dialog and performs instant export with full details mode by default", async () => {
     const user = userEvent.setup();
     const { onExport } = renderPage();
 
@@ -228,6 +228,12 @@ describe("SupplierUnpaidPage", () => {
     expect(within(dialog).getByRole("heading", { name: "Date Range Export" })).toBeInTheDocument();
     expect(within(dialog).getByRole("switch", { name: "Include withdraw balance" })).toBeInTheDocument();
 
+    // Export format selector buttons
+    expect(within(dialog).getByRole("radio", { name: /Full details/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: /Summary only/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: /Raw table data/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: /Full details/i })).toHaveAttribute("aria-checked", "true");
+
     // Instant export action with switch ON (default)
     const instantBtn = within(dialog).getByRole("button", { name: /Instant Export All \(1\)/i });
     await user.click(instantBtn);
@@ -235,6 +241,50 @@ describe("SupplierUnpaidPage", () => {
     expect(onExport).toHaveBeenCalledOnce();
     expect(onExport.mock.calls[0][0]).toEqual([verifiedRecord]);
     expect(onExport.mock.calls[0][3]).toHaveLength(1); // active withdrawal included
+    expect(onExport.mock.calls[0][4]).toEqual({ mode: "full" });
+  });
+
+  it("exports summary-only mode with prewithdraw table when Summary only format is selected", async () => {
+    const user = userEvent.setup();
+    const { onExport } = renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Export batch PNG" }));
+    const dialog = screen.getByRole("dialog");
+
+    const summaryRadio = within(dialog).getByRole("radio", { name: /Summary only/i });
+    await user.click(summaryRadio);
+    expect(summaryRadio).toHaveAttribute("aria-checked", "true");
+
+    const instantBtn = within(dialog).getByRole("button", { name: /Instant Export All \(1\)/i });
+    await user.click(instantBtn);
+
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(onExport.mock.calls[0][3]).toHaveLength(1); // active withdrawal included
+    expect(onExport.mock.calls[0][4]).toEqual({ mode: "summary" });
+  });
+
+  it("exports raw table data mode without prewithdraw when Raw table data format is selected", async () => {
+    const user = userEvent.setup();
+    const { onExport } = renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Export batch PNG" }));
+    const dialog = screen.getByRole("dialog");
+
+    const rawRadio = within(dialog).getByRole("radio", { name: /Raw table data/i });
+    await user.click(rawRadio);
+    expect(rawRadio).toHaveAttribute("aria-checked", "true");
+
+    // Withdraw switch should be disabled in raw mode
+    const switchEl = within(dialog).getByRole("switch", { name: "Include withdraw balance" });
+    expect(switchEl).toBeDisabled();
+    expect(within(dialog).getByText("Excluded in raw mode")).toBeInTheDocument();
+
+    const instantBtn = within(dialog).getByRole("button", { name: /Instant Export All \(1\)/i });
+    await user.click(instantBtn);
+
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(onExport.mock.calls[0][3]).toEqual([]); // withdrawals excluded in raw mode
+    expect(onExport.mock.calls[0][4]).toEqual({ mode: "raw" });
   });
 
   it("toggles include withdraw balance off in export dialog and exports without withdrawals", async () => {

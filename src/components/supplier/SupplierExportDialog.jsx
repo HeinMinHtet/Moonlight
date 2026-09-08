@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Switch } from "@/components/ui/switch.jsx";
+import { cn } from "@/lib/utils.js";
 
 export function SupplierExportDialog({
   isOpen,
@@ -34,12 +35,14 @@ export function SupplierExportDialog({
   const [dateFrom, setDateFrom] = useState(defaultDateFrom);
   const [dateTo, setDateTo] = useState(defaultDateTo);
   const [includeWithdrawals, setIncludeWithdrawals] = useState(true);
+  const [exportMode, setExportMode] = useState("full");
 
   useEffect(() => {
     if (isOpen) {
       setDateFrom(defaultDateFrom);
       setDateTo(defaultDateTo);
       setIncludeWithdrawals(true);
+      setExportMode("full");
     }
   }, [isOpen, defaultDateFrom, defaultDateTo]);
 
@@ -49,12 +52,12 @@ export function SupplierExportDialog({
   );
 
   const effectiveActiveWithdrawals = useMemo(
-    () => (includeWithdrawals ? activeWithdrawals : []),
-    [includeWithdrawals, activeWithdrawals]
+    () => (exportMode !== "raw" && includeWithdrawals ? activeWithdrawals : []),
+    [exportMode, includeWithdrawals, activeWithdrawals]
   );
   const effectiveAllWithdrawalsTotal = useMemo(
-    () => (includeWithdrawals ? allActiveWithdrawalsTotal : 0),
-    [includeWithdrawals, allActiveWithdrawalsTotal]
+    () => (exportMode !== "raw" && includeWithdrawals ? allActiveWithdrawalsTotal : 0),
+    [exportMode, includeWithdrawals, allActiveWithdrawalsTotal]
   );
   const allFinalPrice = allVerifiedTotal - effectiveAllWithdrawalsTotal;
 
@@ -86,12 +89,12 @@ export function SupplierExportDialog({
   );
 
   const effectiveDateRangeWithdrawals = useMemo(
-    () => (includeWithdrawals ? dateRangeWithdrawals : []),
-    [includeWithdrawals, dateRangeWithdrawals]
+    () => (exportMode !== "raw" && includeWithdrawals ? dateRangeWithdrawals : []),
+    [exportMode, includeWithdrawals, dateRangeWithdrawals]
   );
   const effectiveDateRangeWithdrawalsTotal = useMemo(
-    () => (includeWithdrawals ? dateRangeWithdrawalsTotal : 0),
-    [includeWithdrawals, dateRangeWithdrawalsTotal]
+    () => (exportMode !== "raw" && includeWithdrawals ? dateRangeWithdrawalsTotal : 0),
+    [exportMode, includeWithdrawals, dateRangeWithdrawalsTotal]
   );
   const dateRangeFinalPrice = dateRangeTotal - effectiveDateRangeWithdrawalsTotal;
 
@@ -100,14 +103,14 @@ export function SupplierExportDialog({
   const handleInstantExport = () => {
     if (!verifiedRecords.length) return;
     const summary = buildSupplierSummary(verifiedRecords);
-    onExport(verifiedRecords, summary, allVerifiedTotal, effectiveActiveWithdrawals);
+    onExport(verifiedRecords, summary, allVerifiedTotal, effectiveActiveWithdrawals, { mode: exportMode });
     onClose();
   };
 
   const handleDateRangeExport = () => {
     if (!dateRangeVerifiedRecords.length) return;
     const summary = buildSupplierSummary(dateRangeVerifiedRecords);
-    onExport(dateRangeVerifiedRecords, summary, dateRangeTotal, effectiveDateRangeWithdrawals);
+    onExport(dateRangeVerifiedRecords, summary, dateRangeTotal, effectiveDateRangeWithdrawals, { mode: exportMode });
     onClose();
   };
 
@@ -169,26 +172,112 @@ export function SupplierExportDialog({
 
         {/* Modal Content */}
         <div className="p-5 space-y-4">
+          {/* Export Format / Content Selector */}
+          <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-foreground">
+                Export Format / Content
+              </Label>
+              <span className="text-[11px] text-muted-foreground font-mono">
+                {exportMode === "full" && "Full Details"}
+                {exportMode === "summary" && "Summary + Pre-withdraw Only"}
+                {exportMode === "raw" && "Raw Table Only"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Export format">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={exportMode === "full"}
+                onClick={() => setExportMode("full")}
+                className={cn(
+                  "flex flex-col items-start rounded-lg border p-2.5 text-left transition-all cursor-pointer",
+                  exportMode === "full"
+                    ? "border-primary bg-primary/10 text-primary shadow-xs"
+                    : "border-border/70 bg-background/50 hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <span className="text-xs font-bold text-foreground">Full details</span>
+                <span className="text-[10px] leading-tight text-muted-foreground mt-0.5">
+                  All tables &amp; summary
+                </span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={exportMode === "summary"}
+                onClick={() => setExportMode("summary")}
+                className={cn(
+                  "flex flex-col items-start rounded-lg border p-2.5 text-left transition-all cursor-pointer",
+                  exportMode === "summary"
+                    ? "border-primary bg-primary/10 text-primary shadow-xs"
+                    : "border-border/70 bg-background/50 hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <span className="text-xs font-bold text-foreground">Summary only</span>
+                <span className="text-[10px] leading-tight text-muted-foreground mt-0.5">
+                  Summary + pre-withdraw
+                </span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={exportMode === "raw"}
+                onClick={() => setExportMode("raw")}
+                className={cn(
+                  "flex flex-col items-start rounded-lg border p-2.5 text-left transition-all cursor-pointer",
+                  exportMode === "raw"
+                    ? "border-primary bg-primary/10 text-primary shadow-xs"
+                    : "border-border/70 bg-background/50 hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <span className="text-xs font-bold text-foreground">Raw table data</span>
+                <span className="text-[10px] leading-tight text-muted-foreground mt-0.5">
+                  Raw table without summary
+                </span>
+              </button>
+            </div>
+          </div>
+
           {/* Withdraw balance option toggle */}
-          <div className="flex items-center justify-between rounded-xl border border-border/70 bg-card/60 p-3.5">
+          <div
+            className={cn(
+              "flex items-center justify-between rounded-xl border border-border/70 bg-card/60 p-3.5 transition-opacity",
+              exportMode === "raw" && "opacity-50 pointer-events-none"
+            )}
+          >
             <div className="space-y-0.5 pr-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="include-withdrawals-switch" className="text-sm font-semibold text-foreground cursor-pointer">
+                <Label
+                  htmlFor="include-withdrawals-switch"
+                  className={cn(
+                    "text-sm font-semibold text-foreground",
+                    exportMode !== "raw" && "cursor-pointer"
+                  )}
+                >
                   Include withdraw balance
                 </Label>
-                {allActiveWithdrawalsTotal > 0 && (
+                {allActiveWithdrawalsTotal > 0 && exportMode !== "raw" && (
                   <Badge variant="warning" className="text-[10px] px-1.5 py-0.5 font-mono">
                     {activeWithdrawals.length} active (-{money(allActiveWithdrawalsTotal)})
                   </Badge>
                 )}
+                {exportMode === "raw" && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                    Excluded in raw mode
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Deduct active pre-withdrawals and show pre-withdraw breakdown in the exported report.
+                {exportMode === "raw"
+                  ? "Pre-withdraw table and balance deductions are excluded in raw table mode."
+                  : "Deduct active pre-withdrawals and show pre-withdraw breakdown in the exported report."}
               </p>
             </div>
             <Switch
               id="include-withdrawals-switch"
-              checked={includeWithdrawals}
+              checked={exportMode !== "raw" && includeWithdrawals}
+              disabled={exportMode === "raw"}
               onCheckedChange={setIncludeWithdrawals}
               aria-label="Include withdraw balance"
             />
@@ -211,19 +300,23 @@ export function SupplierExportDialog({
             <div className="flex items-center justify-between pt-1">
               <div>
                 <span className="text-[11px] text-muted-foreground block">
-                  {effectiveAllWithdrawalsTotal > 0 ? "Final Settled Amount" : "Total Sales Amount"}
+                  {exportMode === "raw"
+                    ? "Total Sales Amount"
+                    : effectiveAllWithdrawalsTotal > 0
+                    ? "Final Settled Amount"
+                    : "Total Sales Amount"}
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-sm font-bold text-sky-300">
                     {money(allFinalPrice)}
                   </span>
-                  {effectiveAllWithdrawalsTotal > 0 && (
+                  {exportMode !== "raw" && effectiveAllWithdrawalsTotal > 0 && (
                     <span className="text-[11px] text-muted-foreground font-mono">
                       (Sales: {money(allVerifiedTotal)} | Pre-withdraw: -{money(effectiveAllWithdrawalsTotal)})
                     </span>
                   )}
                 </div>
-                {effectiveAllWithdrawalsTotal > 0 && (
+                {exportMode !== "raw" && effectiveAllWithdrawalsTotal > 0 && (
                   <span className="text-[10px] text-emerald-400 font-semibold block">
                     Final settled price after pre-withdrawals
                   </span>
@@ -322,13 +415,17 @@ export function SupplierExportDialog({
             <div className="flex items-center justify-between pt-2 border-t border-border/40">
               <div>
                 <span className="text-[11px] text-muted-foreground block">
-                  {effectiveDateRangeWithdrawalsTotal > 0 ? "Final Settled Amount" : "Selected Range Total"}
+                  {exportMode === "raw"
+                    ? "Selected Range Total"
+                    : effectiveDateRangeWithdrawalsTotal > 0
+                    ? "Final Settled Amount"
+                    : "Selected Range Total"}
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-sm font-bold text-emerald-300">
                     {money(dateRangeFinalPrice)}
                   </span>
-                  {effectiveDateRangeWithdrawalsTotal > 0 && (
+                  {exportMode !== "raw" && effectiveDateRangeWithdrawalsTotal > 0 && (
                     <span className="text-[11px] text-muted-foreground font-mono">
                       (Sales: {money(dateRangeTotal)} | Pre-withdraw: -{money(effectiveDateRangeWithdrawalsTotal)})
                     </span>
