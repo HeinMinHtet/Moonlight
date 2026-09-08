@@ -175,3 +175,115 @@ test("buildSupplierReportSvg exports only date and excludes inserted time even i
   assert.ok(!result.svg.includes("21:35"));
   assert.ok(!result.svg.includes("08:20"));
 });
+
+test("buildSupplierReportSvg in mode 'summary' includes summary and prewithdraw table but omits raw sales rows", () => {
+  const mockWithdrawals = [
+    {
+      id: "w1",
+      date: "2026-08-19",
+      charName: "BankerSummary",
+      guild: "Main Guild",
+      amount: 60,
+      note: "Summary loan"
+    }
+  ];
+
+  const result = buildSupplierReportSvg(mockSales, mockSummary, 500, {
+    mode: "summary",
+    withdrawals: mockWithdrawals
+  });
+
+  assert.equal(result.mode, "summary");
+  assert.equal(result.hasWithdrawals, true);
+  assert.equal(result.finalPrice, 440);
+
+  // Pre-withdraw table is included
+  assert.ok(result.svg.includes("Pre-withdraw Balance / Advances"));
+  assert.ok(result.svg.includes("BankerSummary"));
+
+  // Summary table and totals card are included
+  assert.ok(result.svg.includes("Sale Summary"));
+  assert.ok(result.svg.includes("SALES TOTAL"));
+  assert.ok(result.svg.includes("WITHDRAW BALANCE DEDUCTED"));
+  assert.ok(result.svg.includes("FINAL SETTLED AMOUNT"));
+  assert.ok(result.svg.includes("440"));
+
+  // Raw sales rows (buyer names, main table headers) are omitted
+  assert.ok(!result.svg.includes("AlphaBuyer"));
+  assert.ok(!result.svg.includes("BetaBuyer"));
+  assert.ok(!result.svg.includes("VIP run"));
+});
+
+test("buildSupplierReportSvg in mode 'summary' without withdrawals renders only summary and totals", () => {
+  const result = buildSupplierReportSvg(mockSales, mockSummary, 500, {
+    mode: "summary",
+    withdrawals: []
+  });
+
+  assert.equal(result.mode, "summary");
+  assert.equal(result.hasWithdrawals, false);
+  assert.equal(result.finalPrice, 500);
+
+  assert.ok(!result.svg.includes("Pre-withdraw Balance / Advances"));
+  assert.ok(!result.svg.includes("AlphaBuyer"));
+  assert.ok(!result.svg.includes("BetaBuyer"));
+  assert.ok(result.svg.includes("Sale Summary"));
+  assert.ok(result.svg.includes("FINAL SETTLED AMOUNT"));
+});
+
+test("buildSupplierReportSvg in mode 'raw' exports raw sales records without summary or prewithdraw table", () => {
+  const mockWithdrawals = [
+    {
+      id: "w1",
+      date: "2026-08-19",
+      charName: "BankerRaw",
+      guild: "Main Guild",
+      amount: 100,
+      note: "Should be omitted"
+    }
+  ];
+
+  const result = buildSupplierReportSvg(mockSales, mockSummary, 500, {
+    mode: "raw",
+    withdrawals: mockWithdrawals
+  });
+
+  assert.equal(result.mode, "raw");
+  assert.equal(result.hasWithdrawals, false);
+  assert.equal(result.finalPrice, 500);
+
+  // Raw table and buyer names are included
+  assert.ok(result.svg.includes("AlphaBuyer"));
+  assert.ok(result.svg.includes("BetaBuyer"));
+  assert.ok(result.svg.includes("VIP run"));
+  assert.ok(result.svg.includes("SAVED RATE"));
+
+  // Pre-withdraw table is NOT included
+  assert.ok(!result.svg.includes("Pre-withdraw Balance / Advances"));
+  assert.ok(!result.svg.includes("BankerRaw"));
+
+  // Summary table and totals card are NOT included
+  assert.ok(!result.svg.includes("Sale Summary"));
+  assert.ok(!result.svg.includes("SALES TOTAL"));
+  assert.ok(!result.svg.includes("FINAL SETTLED AMOUNT"));
+});
+
+test("supplierReportFilename appends mode suffix when summary or raw mode is specified", () => {
+  assert.equal(
+    supplierReportFilename(mockSales, { mode: "summary" }),
+    "Sale-Summary-2026-08-20-2026-08-21.png"
+  );
+  assert.equal(
+    supplierReportFilename(mockSales, { mode: "raw" }),
+    "Sale-Raw-2026-08-20-2026-08-21.png"
+  );
+  assert.equal(
+    supplierReportFilename(mockSales, { mode: "full" }),
+    "Sale-2026-08-20-2026-08-21.png"
+  );
+  assert.equal(
+    supplierReportFilename(mockSales),
+    "Sale-2026-08-20-2026-08-21.png"
+  );
+});
+
