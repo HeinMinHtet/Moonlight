@@ -59,6 +59,7 @@ describe("RaidSchedulePage", () => {
     renderPage();
 
     expect(screen.getByRole("heading", { name: /Daily Raid Schedule/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Scan Photo/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Copy raid schedule/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Schedule Run/i })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /Raid week days/i })).toBeInTheDocument();
@@ -211,5 +212,30 @@ describe("RaidSchedulePage", () => {
   it("shows empty state when no runs match filter", () => {
     renderPage({ schedules: [] });
     expect(screen.getByText(/No raid runs scheduled/i)).toBeInTheDocument();
+  });
+
+  it("opens RaidScheduleScanModal when clicking Scan Photo button", async () => {
+    const user = userEvent.setup();
+    const onScanImage = vi.fn();
+    const onBatchInsert = vi.fn();
+
+    renderPage({ onScanImage, onBatchInsert, isAdmin: true });
+    const scanBtn = screen.getByRole("button", { name: /Scan Photo/i });
+    expect(scanBtn).toBeInTheDocument();
+
+    await user.click(scanBtn);
+
+    // Modal should be open
+    expect(screen.getByRole("dialog", { name: /Scan Raid Schedule Photo/i })).toBeInTheDocument();
+
+    // Close modal
+    const cancelBtn = screen.getByRole("button", { name: /Cancel/i });
+    await user.click(cancelBtn);
+    expect(screen.queryByRole("dialog", { name: /Scan Raid Schedule Photo/i })).not.toBeInTheDocument();
+  });
+
+  it("hides Scan Photo button for non-admin users", () => {
+    renderPage({ isAdmin: false });
+    expect(screen.queryByRole("button", { name: /Scan Photo/i })).not.toBeInTheDocument();
   });
 });

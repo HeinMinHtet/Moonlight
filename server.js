@@ -56,6 +56,7 @@ import {
   deleteRaidNote,
   getRaidSchedulesPayload,
   insertRaidSchedule,
+  insertRaidSchedules,
   getRaidScheduleById,
   updateRaidSchedule,
   deleteRaidSchedule,
@@ -66,6 +67,7 @@ import {
   pruneExpiredSessions,
   lineTotal
 } from "./lib/db.js";
+import { extractScheduleFromImage } from "./lib/scheduleImageScanner.js";
 
 const root = resolve(".");
 const publicDir = join(root, "public");
@@ -123,6 +125,7 @@ const rateLimitBuckets = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_AUTH = 30;
 const RATE_LIMIT_MAX_MUTATIONS = 120;
+const RATE_LIMIT_MAX_SCANS = 10;
 
 function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -304,11 +307,11 @@ function permissionsFor(session) {
   };
 }
 
-async function readJson(req) {
+async function readJson(req, maxBytes = 1_000_000) {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 1_000_000) throw Object.assign(new Error("Request body is too large."), { statusCode: 413 });
+    if (body.length > maxBytes) throw Object.assign(new Error("Request body is too large."), { statusCode: 413 });
   }
   if (!body) return {};
   return JSON.parse(body);
@@ -1261,6 +1264,59 @@ async function handleApi(req, res, url) {
     incrementLedgerVersion();
     const payload = await getRaidSchedulesPayload();
     return sendJson(res, 201, { schedule: record, ...payload });
+  }
+
+  if (pathname === "/api/raid-schedules/scan-image" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can scan raid schedule images.");
+    if (!requireCsrf(req, res, session)) return;
+
+    const ip = getClientIp(req);
+    const rateLimitKey = session?.discordId || ip;
+    if (!checkRateLimit(rateLimitKey, "scan", RATE_LIMIT_MAX_SCANS)) {
+      return sendJson(res, 429, { error: "Too many scan requests. Please wait a minute before trying again." });
+    }
+
+    const rawBody = await readJson(req, 10_000_000);
+    const body = (rawBody && typeof rawBody === "object") ? rawBody : {};
+    const image = body.image;
+    if (!image || typeof image !== "string" || !image.trim()) {
+      return sendJson(res, 400, { error: "Image data is required." });
+    }
+
+    const mimeType = String(body.mimeType || "image/jpeg").trim();
+    const weekAnchorDate = body.weekAnchorDate ? String(body.weekAnchorDate).trim() : null;
+
+    try {
+      const result = await extractScheduleFromImage({ image, mimeType, weekAnchorDate });
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const status = err.statusCode || 500;
+      return sendJson(res, status, { error: err.message || "Failed to scan image." });
+    }
+  }
+
+  if (pathname === "/api/raid-schedules/batch" && req.method === "POST") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can batch insert raid schedules.");
+    if (!requireCsrf(req, res, session)) return;
+
+    const rawBody = await readJson(req);
+    const body = (rawBody && typeof rawBody === "object") ? rawBody : {};
+    const runs = Array.isArray(body.runs) ? body.runs : [];
+    if (runs.length === 0) {
+      return sendJson(res, 400, { error: "At least one raid run is required." });
+    }
+    if (runs.length > 100) {
+      return sendJson(res, 400, { error: "Batch import limit exceeded (maximum 100 runs per batch)." });
+    }
+
+    const result = await insertRaidSchedules(runs, session);
+    incrementLedgerVersion();
+    const payload = await getRaidSchedulesPayload();
+    return sendJson(res, 201, {
+      insertedCount: result.count,
+      inserted: result.inserted,
+      ...payload
+    });
   }
 
   if (pathname.startsWith("/api/raid-schedules/") && req.method === "PATCH") {

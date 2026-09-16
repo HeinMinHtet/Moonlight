@@ -444,7 +444,9 @@ export function App() {
     patchRaidSchedule,
     deleteRaidSchedule,
     addBuyerToSchedule,
-    removeBuyerFromSchedule
+    removeBuyerFromSchedule,
+    scanScheduleImage,
+    batchInsertRaidSchedules
   } = useRaidScheduleActions({
     request,
     runAction,
@@ -587,6 +589,8 @@ export function App() {
             onDeleteSchedule={deleteRaidSchedule}
             onAddBuyer={addBuyerToSchedule}
             onRemoveBuyer={removeBuyerFromSchedule}
+            onScanImage={scanScheduleImage}
+            onBatchInsert={batchInsertRaidSchedules}
           />
         )}
 

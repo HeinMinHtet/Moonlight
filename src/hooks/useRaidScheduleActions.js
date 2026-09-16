@@ -92,11 +92,34 @@ export function useRaidScheduleActions({
     showToast(`Removed buyer ${removed || ""}.`);
   });
 
+  const scanScheduleImage = async ({ image, mimeType, weekAnchorDate }) => {
+    return await request("/api/raid-schedules/scan-image", {
+      method: "POST",
+      body: JSON.stringify({ image, mimeType, weekAnchorDate })
+    });
+  };
+
+  const batchInsertRaidSchedules = (runs) => runAction(async () => {
+    const payload = await request("/api/raid-schedules/batch", {
+      method: "POST",
+      body: JSON.stringify({ runs })
+    });
+    setData((current) => ({
+      ...current,
+      raidSchedules: payload.schedules || (current.raidSchedules || [])
+    }));
+    const count = payload.insertedCount || (payload.inserted || []).length;
+    showToast(`Successfully imported ${count} raid runs.`);
+    return payload;
+  });
+
   return {
     submitRaidSchedule,
     patchRaidSchedule,
     deleteRaidSchedule,
     addBuyerToSchedule,
-    removeBuyerFromSchedule
+    removeBuyerFromSchedule,
+    scanScheduleImage,
+    batchInsertRaidSchedules
   };
 }

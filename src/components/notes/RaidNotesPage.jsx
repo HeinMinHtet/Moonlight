@@ -102,9 +102,24 @@ export function RaidNotesPage({
   const isCustomSelected =
     selectedDate !== "all" && !dateOptions.some((d) => d.dateStr === selectedDate);
 
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return 9999;
+  const match = timeStr.toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if (!match) return 9999;
+  
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2] ? parseInt(match[2], 10) : 0;
+  const ampm = match[3];
+
+  if (ampm === "pm" && hours < 12) hours += 12;
+  if (ampm === "am" && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+}
+
   // Filter notes based on statusTab, selectedDate, and search
   const filteredNotes = useMemo(() => {
-    return currentTabNotes.filter((note) => {
+    const filtered = currentTabNotes.filter((note) => {
       // 1. Date filter
       if (selectedDate !== "all" && note.raidDate !== selectedDate) {
         return false;
@@ -124,7 +139,31 @@ export function RaidNotesPage({
 
       return true;
     });
-  }, [currentTabNotes, selectedDate, search]);
+
+    return filtered.sort((a, b) => {
+      const getCategory = (date) => {
+        if (!date) return 3;
+        if (date === todayStr) return 0;
+        if (date > todayStr) return 1;
+        return 2;
+      };
+
+      const catA = getCategory(a.raidDate);
+      const catB = getCategory(b.raidDate);
+
+      if (catA !== catB) return catA - catB;
+
+      if (a.raidDate !== b.raidDate) {
+        if (catA === 1) return a.raidDate.localeCompare(b.raidDate);
+        if (catA === 2) return b.raidDate.localeCompare(a.raidDate);
+      }
+
+      const timeA = parseTimeToMinutes(a.raidTime);
+      const timeB = parseTimeToMinutes(b.raidTime);
+
+      return timeA - timeB;
+    });
+  }, [currentTabNotes, selectedDate, search, todayStr]);
 
   // Split into pinned and others (for active tab)
   const pinnedNotes = useMemo(

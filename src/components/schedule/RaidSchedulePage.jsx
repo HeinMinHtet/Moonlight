@@ -17,7 +17,8 @@ import {
   Swords,
   Lock,
   Unlock,
-  Pencil
+  Pencil,
+  Camera
 } from "lucide-react";
 import { Input } from "@/components/ui/input.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -26,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { cn } from "@/lib/utils.js";
 import { toast as notify } from "sonner";
+import { RaidScheduleScanModal } from "./RaidScheduleScanModal.jsx";
 
 // Default Midnight Season 2 raids
 const DEFAULT_RAIDS = [
@@ -99,8 +101,11 @@ export function RaidSchedulePage({
   onPatchSchedule,
   onDeleteSchedule,
   onAddBuyer,
-  onRemoveBuyer
+  onRemoveBuyer,
+  onScanImage,
+  onBatchInsert
 }) {
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [showEntireWeek, setShowEntireWeek] = useState(false);
@@ -313,6 +318,20 @@ export function RaidSchedulePage({
 
         {/* Quick Action Buttons */}
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsScanModalOpen(true)}
+              className="text-xs gap-1.5 border-border bg-card hover:bg-secondary"
+              title="Scan uploaded raid schedule image with AI"
+            >
+              <Camera className="size-3.5 text-primary" />
+              <span>Scan Photo</span>
+            </Button>
+          )}
+
           <Button
             type="button"
             variant="outline"
@@ -1054,6 +1073,17 @@ export function RaidSchedulePage({
             await onPatchSchedule(id, updates);
             setEditingRun(null);
           }}
+        />
+      )}
+
+      {/* 8. Scan Raid Schedule Photo Modal */}
+      {isAdmin && (
+        <RaidScheduleScanModal
+          isOpen={isScanModalOpen}
+          weekAnchorDate={weekStart.dateStr}
+          onClose={() => setIsScanModalOpen(false)}
+          onScanImage={onScanImage}
+          onBatchInsert={onBatchInsert}
         />
       )}
     </div>
