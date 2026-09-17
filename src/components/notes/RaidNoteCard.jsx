@@ -17,6 +17,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
+import { NativeSelect } from "@/components/ui/native-select.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu.jsx";
 import { cn } from "@/lib/utils.js";
@@ -40,7 +41,7 @@ const COLOR_MENU_ITEMS = [
   { id: "rose", label: "Rose" }
 ];
 
-export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
+export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDeleteNote }) {
   const [newBuyer, setNewBuyer] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedItemId, setCopiedItemId] = useState(null);
@@ -50,6 +51,8 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
   const [timeDraft, setTimeDraft] = useState(note.raidTime || "");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
+
+  const activeTitles = raidNoteTitles.filter((t) => t.active !== false);
 
   const items = Array.isArray(note.items) ? note.items : [];
   const totalItems = items.length;
@@ -229,18 +232,37 @@ export function RaidNoteCard({ note, onUpdateNote, onDeleteNote }) {
             <label className="text-[10px] font-medium text-muted-foreground block mb-0.5">
               Title
             </label>
-            <Input
-              aria-label="Edit raid title"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSaveDetails();
-                if (e.key === "Escape") handleCancelEdit();
-              }}
-              placeholder="Raid Title (e.g. Heroic 8/8 10 am)"
-              className="h-7 text-xs font-bold bg-field/90 border-border/80 focus-visible:ring-1 focus-visible:ring-primary"
-              autoFocus
-            />
+            {activeTitles.length > 0 ? (
+              <NativeSelect
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveDetails();
+                  if (e.key === "Escape") handleCancelEdit();
+                }}
+                className="h-7 text-xs font-bold bg-field/90 border-border/80 focus-visible:ring-1 focus-visible:ring-primary min-h-0 py-0"
+              >
+                {!activeTitles.some(t => t.name === titleDraft) && titleDraft && (
+                  <option value={titleDraft}>{titleDraft}</option>
+                )}
+                {activeTitles.map((t) => (
+                  <option key={t.name} value={t.name}>{t.name}</option>
+                ))}
+              </NativeSelect>
+            ) : (
+              <Input
+                aria-label="Edit raid title"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveDetails();
+                  if (e.key === "Escape") handleCancelEdit();
+                }}
+                placeholder="Raid Title (e.g. Heroic 8/8 10 am)"
+                className="h-7 text-xs font-bold bg-field/90 border-border/80 focus-visible:ring-1 focus-visible:ring-primary"
+                autoFocus
+              />
+            )}
           </div>
 
           {/* Date & Time Row */}

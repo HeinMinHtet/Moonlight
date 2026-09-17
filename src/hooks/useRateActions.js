@@ -30,6 +30,7 @@ export function useRateActions({
   boosterPrices,
   supplierGuilds,
   armorTypes,
+  raidNoteTitles,
   supplierRecords,
   supplierHistory,
   boosterRecords,
@@ -76,6 +77,20 @@ export function useRateActions({
       supplierGuilds: payload.supplierGuilds || []
     }));
     showToast("Supplier guilds saved.");
+  });
+
+  const saveRaidNoteTitles = (event) => runAction(async () => {
+    event.preventDefault();
+    validateGuildRows(raidNoteTitles); // reuse validation since it only checks name
+    const payload = await request("/api/prices/raid-titles", {
+      method: "PUT",
+      body: JSON.stringify({ rows: raidNoteTitles })
+    });
+    setData((current) => ({
+      ...current,
+      raidNoteTitles: payload.raidNoteTitles || []
+    }));
+    showToast("Raid note titles saved.");
   });
 
   const saveArmorTypes = (event) => runAction(async () => {
@@ -220,6 +235,58 @@ export function useRateActions({
     });
   };
 
+  const addRaidNoteTitleRow = () => {
+    if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit raid note titles.");
+    setData((current) => ({
+      ...current,
+      raidNoteTitles: [...(current.raidNoteTitles || []), { name: "", active: true, isDefault: false }]
+    }));
+  };
+
+  const updateRaidNoteTitleRow = (index, patch) => {
+    setData((current) => ({
+      ...current,
+      raidNoteTitles: (current.raidNoteTitles || []).map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row))
+    }));
+  };
+
+  const toggleRaidNoteTitleRowStatus = (index) => runAction(async () => {
+    const row = (raidNoteTitles || [])[index];
+    if (!row) return;
+    const archiving = row.active !== false;
+    setData((current) => ({
+      ...current,
+      raidNoteTitles: current.raidNoteTitles.map((item, rowIndex) => (
+        rowIndex === index ? { ...item, active: !archiving } : item
+      ))
+    }));
+    showToast(archiving ? "Title marked for archive. Save changes to apply." : "Title restored. Save changes to apply.");
+  });
+
+  const deleteRaidNoteTitleRow = (index) => {
+    setData((current) => ({
+      ...current,
+      raidNoteTitles: (current.raidNoteTitles || []).filter((_, rowIndex) => rowIndex !== index)
+    }));
+    showToast("Title removed. Save changes to apply.");
+  };
+
+  const setDefaultRaidNoteTitleRow = (index) => {
+    setData((current) => {
+      const currentRows = current.raidNoteTitles || [];
+      const targetRow = currentRows[index];
+      if (!targetRow) return current;
+      const willBeDefault = !targetRow.isDefault;
+      return {
+        ...current,
+        raidNoteTitles: currentRows.map((row, rowIndex) => ({
+          ...row,
+          isDefault: rowIndex === index ? willBeDefault : false
+        }))
+      };
+    });
+  };
+
   const addArmorRow = () => {
     if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit armor stack options.");
     setData((current) => ({
@@ -297,6 +364,12 @@ export function useRateActions({
     toggleGuildRowStatus,
     deleteGuildRow,
     setDefaultGuildRow,
+    saveRaidNoteTitles,
+    addRaidNoteTitleRow,
+    updateRaidNoteTitleRow,
+    toggleRaidNoteTitleRowStatus,
+    deleteRaidNoteTitleRow,
+    setDefaultRaidNoteTitleRow,
     addArmorRow,
     updateArmorRow,
     toggleArmorRowStatus,

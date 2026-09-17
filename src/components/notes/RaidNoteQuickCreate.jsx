@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { Plus, Pin, PinOff, Palette, Check, X, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
+import { NativeSelect } from "@/components/ui/native-select.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { cn } from "@/lib/utils.js";
 
@@ -14,9 +15,10 @@ const COLOR_OPTIONS = [
   { id: "rose", label: "Rose", bg: "bg-rose-950/40 border-rose-500/40 text-rose-300" }
 ];
 
-export function RaidNoteQuickCreate({ onCreateNote }) {
+export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
+  const defaultTitle = raidNoteTitles.find((t) => t.isDefault)?.name || (raidNoteTitles[0]?.name || "");
   const [expanded, setExpanded] = useState(false);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(defaultTitle);
   const [raidDate, setRaidDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [raidTime, setRaidTime] = useState("");
   const [color, setColor] = useState("default");
@@ -28,6 +30,13 @@ export function RaidNoteQuickCreate({ onCreateNote }) {
   const [submitting, setSubmitting] = useState(false);
 
   const buyerInputRef = useRef(null);
+
+  // Sync default title if it changes while collapsed
+  React.useEffect(() => {
+    if (!expanded) {
+      setTitle(defaultTitle);
+    }
+  }, [defaultTitle, expanded]);
 
   const handleAddBuyer = () => {
     const trimmed = buyerInput.trim();
@@ -61,7 +70,7 @@ export function RaidNoteQuickCreate({ onCreateNote }) {
   };
 
   const handleReset = () => {
-    setTitle("");
+    setTitle(defaultTitle);
     setRaidDate(new Date().toISOString().slice(0, 10));
     setRaidTime("");
     setColor("default");
@@ -119,6 +128,7 @@ export function RaidNoteQuickCreate({ onCreateNote }) {
   }
 
   const selectedColorOption = COLOR_OPTIONS.find((c) => c.id === color) || COLOR_OPTIONS[0];
+  const activeTitles = raidNoteTitles.filter((t) => t.active !== false);
 
   return (
     <div
@@ -129,13 +139,25 @@ export function RaidNoteQuickCreate({ onCreateNote }) {
     >
       {/* Header: Title & Pin button */}
       <div className="flex items-start justify-between gap-2">
-        <Input
-          placeholder="Raid Title (e.g. Heroic 8/8 10 am, Mythic 4/8 8pm)..."
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          autoFocus
-          className="text-base font-semibold border-none bg-transparent px-1 focus-visible:ring-0 placeholder:text-muted-foreground/70"
-        />
+        {activeTitles.length > 0 ? (
+          <NativeSelect
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-base font-semibold border-none bg-transparent px-1 focus-visible:ring-0 shadow-none min-h-0 h-8"
+          >
+            {activeTitles.map((t) => (
+              <option key={t.name} value={t.name}>{t.name}</option>
+            ))}
+          </NativeSelect>
+        ) : (
+          <Input
+            placeholder="Raid Title (e.g. Heroic 8/8 10 am, Mythic 4/8 8pm)..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+            className="text-base font-semibold border-none bg-transparent px-1 focus-visible:ring-0 placeholder:text-muted-foreground/70"
+          />
+        )}
         <Button
           type="button"
           variant="ghost"

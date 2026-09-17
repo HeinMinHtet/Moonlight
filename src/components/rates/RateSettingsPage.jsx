@@ -3,6 +3,7 @@ import { Plus, Star, Trash2 } from "lucide-react";
 import { AccessDenied } from "../AccessDenied.jsx";
 import { SupplierGuildsPanel } from "./SupplierGuildsPanel.jsx";
 import { ArmorStacksPanel } from "./ArmorStacksPanel.jsx";
+import { RaidNoteTitlesPanel } from "./RaidNoteTitlesPanel.jsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -20,6 +21,8 @@ export function RateSettingsPage({
   boosterPrices,
   supplierGuilds = [],
   armorTypes = [],
+  raidNoteTitles = [],
+  raidNotes = [],
   supplierRecords,
   boosterRecords,
   supplierWithdrawals = [],
@@ -41,7 +44,13 @@ export function RateSettingsPage({
   onDeleteArmorRow,
   onSetDefaultArmorRow,
   onUpdateArmorRow,
-  onSaveArmorTypes
+  onSaveArmorTypes,
+  onSaveRaidNoteTitles,
+  onAddRaidNoteTitleRow,
+  onUpdateRaidNoteTitleRow,
+  onToggleRaidNoteTitleRow,
+  onDeleteRaidNoteTitleRow,
+  onSetDefaultRaidNoteTitleRow
 }) {
   if (!isAdmin) return <AccessDenied />;
   if (loading) {
@@ -145,6 +154,17 @@ export function RateSettingsPage({
           onSetDefault={onSetDefaultArmorRow}
           onChange={onUpdateArmorRow}
           onSubmit={onSaveArmorTypes}
+        />
+        <RaidNoteTitlesPanel
+          rows={raidNoteTitles}
+          notes={raidNotes}
+          disabled={!canEditPrices}
+          onAdd={onAddRaidNoteTitleRow}
+          onToggle={onToggleRaidNoteTitleRow}
+          onDelete={onDeleteRaidNoteTitleRow}
+          onSetDefault={onSetDefaultRaidNoteTitleRow}
+          onChange={onUpdateRaidNoteTitleRow}
+          onSubmit={onSaveRaidNoteTitles}
         />
       </section>
     </section>

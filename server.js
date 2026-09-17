@@ -13,6 +13,7 @@ import {
   getArmorTypesList,
   getSupplierGuildsList,
   updateSupplierGuilds,
+  updateRaidNoteTitles,
   getSupplierWithdrawalsPayload,
   insertSupplierWithdrawal,
   getSupplierWithdrawalById,
@@ -84,9 +85,10 @@ if (
     process.env.SESSION_SECRET === "local-development-secret" ||
     process.env.SESSION_SECRET === "change-this-long-random-secret")
 ) {
-  console.warn(
-    "[SECURITY WARNING] Running in production with an unset or default SESSION_SECRET. Set a strong random SESSION_SECRET in your environment before public launch."
+  console.error(
+    "[SECURITY CRITICAL] Running in production with an unset or default SESSION_SECRET. Set a strong random SESSION_SECRET in your environment before public launch. Exiting."
   );
+  process.exit(1);
 }
 const SESSION_MAX_AGE_MS = Number(process.env.SESSION_MAX_AGE_HOURS || 12) * 60 * 60 * 1000;
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -95,7 +97,6 @@ const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 const DISCORD_ADMIN_ROLE_IDS = parseIdList(process.env.DISCORD_ADMIN_ROLE_IDS);
 const DISCORD_BOOSTER_ROLE_IDS = parseIdList(process.env.DISCORD_BOOSTER_ROLE_IDS);
 const sessions = new Map();
-const oauthStates = new Map();
 let ledgerVersion = 1;
 
 export function incrementLedgerVersion() {
@@ -128,8 +129,10 @@ const RATE_LIMIT_MAX_MUTATIONS = 120;
 const RATE_LIMIT_MAX_SCANS = 10;
 
 function getClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) return String(forwarded).split(",")[0].trim();
+  if (process.env.TRUST_PROXY === "true") {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (forwarded) return String(forwarded).split(",")[0].trim();
+  }
   return req.socket?.remoteAddress || "127.0.0.1";
 }
 
@@ -203,7 +206,7 @@ function makeCookie(payload) {
   return `${encoded}.${sign(encoded)}`;
 }
 
-function readCookie(req) {
+function readCookie(req, cookieName = "wow_ledger_session") {
   const header = req.headers.cookie || "";
   const cookies = Object.fromEntries(
     header.split(";").map((part) => {
@@ -211,7 +214,7 @@ function readCookie(req) {
       return [key, value.join("=")];
     }).filter(([key]) => key)
   );
-  const raw = cookies.wow_ledger_session;
+  const raw = cookies[cookieName];
   if (!raw || !raw.includes(".")) return null;
   const [encoded, signature] = raw.split(".");
   const expectedSig = Buffer.from(sign(encoded));
@@ -314,7 +317,11 @@ async function readJson(req, maxBytes = 1_000_000) {
     if (body.length > maxBytes) throw Object.assign(new Error("Request body is too large."), { statusCode: 413 });
   }
   if (!body) return {};
-  return JSON.parse(body);
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    throw Object.assign(new Error("Invalid JSON payload."), { statusCode: 400 });
+  }
 }
 
 function sendJson(res, status, payload, etag = null) {
@@ -1046,6 +1053,16 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { supplierGuilds });
   }
 
+  if (pathname === "/api/prices/raid-titles" && req.method === "PUT") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change raid note titles.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const cleaned = cleanRaidTitleRows(body.rows);
+    const raidNoteTitles = await updateRaidNoteTitles(cleaned);
+    incrementLedgerVersion();
+    return sendJson(res, 200, { raidNoteTitles });
+  }
+
   if (pathname === "/api/prices/armor-types" && req.method === "PUT") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change armor stack options.");
     if (!requireCsrf(req, res, session)) return;
@@ -1415,6 +1432,29 @@ function cleanGuildRows(rows) {
   return cleaned;
 }
 
+function cleanRaidTitleRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw Object.assign(new Error("Keep at least one raid note title. Archive titles that should no longer be used."), { statusCode: 400 });
+  }
+  const cleaned = rows.map((row) => ({
+    name: String(row.name || "").trim(),
+    active: row.active !== false,
+    isDefault: Boolean(row.isDefault)
+  }));
+  if (cleaned.some((row) => !row.name)) {
+    throw Object.assign(new Error("Every raid note title needs a name."), { statusCode: 400 });
+  }
+  const seen = new Set();
+  for (const row of cleaned) {
+    const normalizedName = row.name.toLocaleLowerCase();
+    if (seen.has(normalizedName)) {
+      throw Object.assign(new Error("Duplicate raid note titles are not allowed."), { statusCode: 400 });
+    }
+    seen.add(normalizedName);
+  }
+  return cleaned;
+}
+
 function cleanPriceRows(rows, key) {
   if (!Array.isArray(rows) || !rows.length) {
     throw Object.assign(new Error("Keep at least one rate row. Archive rates that should no longer be used."), { statusCode: 400 });
@@ -1448,9 +1488,8 @@ async function handleDiscord(req, res, url) {
   if (!discordReady()) return redirectWithAuthError(res, "Discord login is not configured yet. Add OAuth, server, and role IDs.");
 
   if (url.pathname === "/auth/discord") {
-    pruneOAuthStates();
     const state = randomBytes(16).toString("base64url");
-    oauthStates.set(state, Date.now() + OAUTH_STATE_MAX_AGE_MS);
+    res.setHeader("Set-Cookie", `wow_ledger_oauth_state=${makeCookie({ state })}; ${cookieOptions(Math.floor(OAUTH_STATE_MAX_AGE_MS / 1000))}`);
     const params = new URLSearchParams({
       client_id: process.env.DISCORD_CLIENT_ID,
       redirect_uri: process.env.DISCORD_REDIRECT_URI,
@@ -1465,9 +1504,9 @@ async function handleDiscord(req, res, url) {
   if (url.pathname === "/auth/discord/callback") {
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
-    const stateExpiresAt = oauthStates.get(state);
-    if (!code || !state || !stateExpiresAt || Date.now() > stateExpiresAt) return redirectWithAuthError(res, "Discord sign-in expired. Try again.");
-    oauthStates.delete(state);
+    const stateCookie = readCookie(req, "wow_ledger_oauth_state");
+    res.setHeader("Set-Cookie", `wow_ledger_oauth_state=; ${cookieOptions(0)}`);
+    if (!code || !state || !stateCookie || state !== stateCookie.state) return redirectWithAuthError(res, "Discord sign-in expired or invalid. Try again.");
 
     try {
       const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
@@ -1514,13 +1553,6 @@ function roleFromDiscordMember(member) {
   if ([...DISCORD_ADMIN_ROLE_IDS].some((id) => roles.has(id))) return "admin";
   if ([...DISCORD_BOOSTER_ROLE_IDS].some((id) => roles.has(id))) return "booster";
   return null;
-}
-
-function pruneOAuthStates() {
-  const now = Date.now();
-  for (const [state, expiresAt] of oauthStates.entries()) {
-    if (now > expiresAt) oauthStates.delete(state);
-  }
 }
 
 function redirectWithAuthError(res, message) {

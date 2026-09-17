@@ -36,6 +36,7 @@ const initialState = {
   boosterPrices: [],
   supplierGuilds: [],
   armorTypes: [],
+  raidNoteTitles: [],
   supplierRecords: [],
   supplierWithdrawals: [],
   supplierHistory: [],
@@ -196,6 +197,7 @@ export function App() {
           boosterPrices: preserveRateDrafts ? current.boosterPrices : (config.boosterPrices || []),
           supplierGuilds: preserveRateDrafts ? current.supplierGuilds : (config.supplierGuilds || []),
           armorTypes: preserveRateDrafts ? current.armorTypes : (config.armorTypes || []),
+          raidNoteTitles: preserveRateDrafts ? current.raidNoteTitles : (config.raidNoteTitles || []),
           supplierRecords: supplierPayload
             ? (supplierPayload.records || [])
             : config.permissions.supplierRecords ? current.supplierRecords : [],
@@ -472,6 +474,12 @@ export function App() {
     toggleGuildRowStatus,
     deleteGuildRow,
     setDefaultGuildRow,
+    saveRaidNoteTitles,
+    addRaidNoteTitleRow,
+    updateRaidNoteTitleRow,
+    toggleRaidNoteTitleRowStatus,
+    deleteRaidNoteTitleRow,
+    setDefaultRaidNoteTitleRow,
     addArmorRow,
     updateArmorRow,
     toggleArmorRowStatus,
@@ -488,6 +496,7 @@ export function App() {
     boosterPrices: data.boosterPrices,
     supplierGuilds: data.supplierGuilds,
     armorTypes: data.armorTypes,
+    raidNoteTitles: data.raidNoteTitles,
     supplierRecords: data.supplierRecords,
     supplierHistory: data.supplierHistory,
     boosterRecords: data.boosterRecords,
@@ -600,6 +609,7 @@ export function App() {
             loading={loading}
             loadError={loadError}
             notes={data.raidNotes}
+            raidNoteTitles={data.raidNoteTitles}
             onCreateNote={createRaidNote}
             onUpdateNote={patchRaidNote}
             onDeleteNote={deleteRaidNote}
@@ -662,6 +672,8 @@ export function App() {
             boosterPrices={data.boosterPrices}
             supplierGuilds={data.supplierGuilds}
             armorTypes={data.armorTypes}
+            raidNoteTitles={data.raidNoteTitles}
+            raidNotes={data.raidNotes}
             supplierRecords={[...data.supplierRecords, ...data.supplierHistory]}
             boosterRecords={data.boosterRecords}
             supplierWithdrawals={data.supplierWithdrawals}
@@ -684,6 +696,12 @@ export function App() {
             onSetDefaultArmorRow={setDefaultArmorRow}
             onUpdateArmorRow={updateArmorRow}
             onSaveArmorTypes={saveArmorTypes}
+            onSaveRaidNoteTitles={saveRaidNoteTitles}
+            onAddRaidNoteTitleRow={addRaidNoteTitleRow}
+            onUpdateRaidNoteTitleRow={updateRaidNoteTitleRow}
+            onToggleRaidNoteTitleRow={toggleRaidNoteTitleRowStatus}
+            onDeleteRaidNoteTitleRow={deleteRaidNoteTitleRow}
+            onSetDefaultRaidNoteTitleRow={setDefaultRaidNoteTitleRow}
           />
         )}
 
