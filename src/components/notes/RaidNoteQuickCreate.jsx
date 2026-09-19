@@ -15,9 +15,9 @@ const COLOR_OPTIONS = [
   { id: "rose", label: "Rose", bg: "bg-rose-950/40 border-rose-500/40 text-rose-300" }
 ];
 
-export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], supplierServices = [] }) {
+export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], buyerPurchaseTypes = [] }) {
   const defaultTitle = raidNoteTitles.find((t) => t.isDefault)?.name || (raidNoteTitles[0]?.name || "");
-  const defaultPurchaseType = supplierServices.find((s) => s.isDefault && s.active !== false)?.type || (supplierServices.filter(s => s.active !== false)[0]?.type || "");
+  const defaultPurchaseType = buyerPurchaseTypes.find((s) => s.isDefault && s.active !== false)?.name || (buyerPurchaseTypes.filter(s => s.active !== false)[0]?.name || "");
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState(defaultTitle);
   const [raidDate, setRaidDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -241,14 +241,14 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], supplie
               onKeyDown={handleBuyerKeyDown}
               className="h-9 text-xs bg-field/80 border-border flex-1 font-mono"
             />
-            {supplierServices.length > 0 && (
+            {buyerPurchaseTypes.length > 0 && (
               <NativeSelect
                 value={buyerPurchaseType}
                 onChange={(e) => setBuyerPurchaseType(e.target.value)}
                 className="h-9 text-xs bg-field/80 border-border w-[110px]"
               >
-                {supplierServices.filter(s => s.active !== false).map((s) => (
-                  <option key={s.type} value={s.type}>{s.type}</option>
+                {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
+                  <option key={s.name} value={s.name}>{s.name}</option>
                 ))}
               </NativeSelect>
             )}

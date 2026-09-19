@@ -31,6 +31,7 @@ export function useRateActions({
   supplierGuilds,
   armorTypes,
   raidNoteTitles,
+  buyerPurchaseTypes,
   supplierRecords,
   supplierHistory,
   boosterRecords,
@@ -91,6 +92,20 @@ export function useRateActions({
       raidNoteTitles: payload.raidNoteTitles || []
     }));
     showToast("Raid note titles saved.");
+  });
+
+  const saveBuyerPurchaseTypes = (event) => runAction(async () => {
+    event.preventDefault();
+    validateGuildRows(buyerPurchaseTypes); // reuse validation since it only checks name
+    const payload = await request("/api/prices/buyer-purchase-types", {
+      method: "PUT",
+      body: JSON.stringify({ rows: buyerPurchaseTypes })
+    });
+    setData((current) => ({
+      ...current,
+      buyerPurchaseTypes: payload.buyerPurchaseTypes || []
+    }));
+    showToast("Buyer purchase types saved.");
   });
 
   const saveArmorTypes = (event) => runAction(async () => {
@@ -287,6 +302,58 @@ export function useRateActions({
     });
   };
 
+  const addBuyerPurchaseTypeRow = () => {
+    if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit purchase types.");
+    setData((current) => ({
+      ...current,
+      buyerPurchaseTypes: [...(current.buyerPurchaseTypes || []), { name: "", active: true, isDefault: false }]
+    }));
+  };
+
+  const updateBuyerPurchaseTypeRow = (index, patch) => {
+    setData((current) => ({
+      ...current,
+      buyerPurchaseTypes: (current.buyerPurchaseTypes || []).map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row))
+    }));
+  };
+
+  const toggleBuyerPurchaseTypeRowStatus = (index) => runAction(async () => {
+    const row = (buyerPurchaseTypes || [])[index];
+    if (!row) return;
+    const archiving = row.active !== false;
+    setData((current) => ({
+      ...current,
+      buyerPurchaseTypes: current.buyerPurchaseTypes.map((item, rowIndex) => (
+        rowIndex === index ? { ...item, active: !archiving } : item
+      ))
+    }));
+    showToast(archiving ? "Type marked for archive. Save changes to apply." : "Type restored. Save changes to apply.");
+  });
+
+  const deleteBuyerPurchaseTypeRow = (index) => {
+    setData((current) => ({
+      ...current,
+      buyerPurchaseTypes: (current.buyerPurchaseTypes || []).filter((_, rowIndex) => rowIndex !== index)
+    }));
+    showToast("Type removed. Save changes to apply.");
+  };
+
+  const setDefaultBuyerPurchaseTypeRow = (index) => {
+    setData((current) => {
+      const currentRows = current.buyerPurchaseTypes || [];
+      const targetRow = currentRows[index];
+      if (!targetRow) return current;
+      const willBeDefault = !targetRow.isDefault;
+      return {
+        ...current,
+        buyerPurchaseTypes: currentRows.map((row, rowIndex) => ({
+          ...row,
+          isDefault: rowIndex === index ? willBeDefault : false
+        }))
+      };
+    });
+  };
+
   const addArmorRow = () => {
     if (!permissions.canEditPrices) return showToast("Discord admin role is required to edit armor stack options.");
     setData((current) => ({
@@ -370,6 +437,12 @@ export function useRateActions({
     toggleRaidNoteTitleRowStatus,
     deleteRaidNoteTitleRow,
     setDefaultRaidNoteTitleRow,
+    saveBuyerPurchaseTypes,
+    addBuyerPurchaseTypeRow,
+    updateBuyerPurchaseTypeRow,
+    toggleBuyerPurchaseTypeRowStatus,
+    deleteBuyerPurchaseTypeRow,
+    setDefaultBuyerPurchaseTypeRow,
     addArmorRow,
     updateArmorRow,
     toggleArmorRowStatus,

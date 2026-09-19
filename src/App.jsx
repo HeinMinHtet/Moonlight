@@ -37,6 +37,7 @@ const initialState = {
   supplierGuilds: [],
   armorTypes: [],
   raidNoteTitles: [],
+  buyerPurchaseTypes: [],
   supplierRecords: [],
   supplierWithdrawals: [],
   supplierHistory: [],
@@ -198,6 +199,7 @@ export function App() {
           supplierGuilds: preserveRateDrafts ? current.supplierGuilds : (config.supplierGuilds || []),
           armorTypes: preserveRateDrafts ? current.armorTypes : (config.armorTypes || []),
           raidNoteTitles: preserveRateDrafts ? current.raidNoteTitles : (config.raidNoteTitles || []),
+          buyerPurchaseTypes: preserveRateDrafts ? current.buyerPurchaseTypes : (config.buyerPurchaseTypes || []),
           supplierRecords: supplierPayload
             ? (supplierPayload.records || [])
             : config.permissions.supplierRecords ? current.supplierRecords : [],
@@ -480,6 +482,12 @@ export function App() {
     toggleRaidNoteTitleRowStatus,
     deleteRaidNoteTitleRow,
     setDefaultRaidNoteTitleRow,
+    saveBuyerPurchaseTypes,
+    addBuyerPurchaseTypeRow,
+    updateBuyerPurchaseTypeRow,
+    toggleBuyerPurchaseTypeRowStatus,
+    deleteBuyerPurchaseTypeRow,
+    setDefaultBuyerPurchaseTypeRow,
     addArmorRow,
     updateArmorRow,
     toggleArmorRowStatus,
@@ -497,6 +505,7 @@ export function App() {
     supplierGuilds: data.supplierGuilds,
     armorTypes: data.armorTypes,
     raidNoteTitles: data.raidNoteTitles,
+    buyerPurchaseTypes: data.buyerPurchaseTypes,
     supplierRecords: data.supplierRecords,
     supplierHistory: data.supplierHistory,
     boosterRecords: data.boosterRecords,
@@ -610,7 +619,7 @@ export function App() {
             loadError={loadError}
             notes={data.raidNotes}
             raidNoteTitles={data.raidNoteTitles}
-            supplierServices={data.supplierServices}
+            buyerPurchaseTypes={data.buyerPurchaseTypes}
             onCreateNote={createRaidNote}
             onUpdateNote={patchRaidNote}
             onDeleteNote={deleteRaidNote}
@@ -703,6 +712,13 @@ export function App() {
             onToggleRaidNoteTitleRow={toggleRaidNoteTitleRowStatus}
             onDeleteRaidNoteTitleRow={deleteRaidNoteTitleRow}
             onSetDefaultRaidNoteTitleRow={setDefaultRaidNoteTitleRow}
+            buyerPurchaseTypes={data.buyerPurchaseTypes}
+            onSaveBuyerPurchaseTypes={saveBuyerPurchaseTypes}
+            onAddBuyerPurchaseTypeRow={addBuyerPurchaseTypeRow}
+            onUpdateBuyerPurchaseTypeRow={updateBuyerPurchaseTypeRow}
+            onToggleBuyerPurchaseTypeRow={toggleBuyerPurchaseTypeRowStatus}
+            onDeleteBuyerPurchaseTypeRow={deleteBuyerPurchaseTypeRow}
+            onSetDefaultBuyerPurchaseTypeRow={setDefaultBuyerPurchaseTypeRow}
           />
         )}
 

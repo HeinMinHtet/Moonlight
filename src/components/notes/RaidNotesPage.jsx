@@ -55,9 +55,9 @@ export function RaidNotesPage({
   isAdmin,
   loading,
   loadError,
-  notes = [],
+  notes,
   raidNoteTitles = [],
-  supplierServices = [],
+  buyerPurchaseTypes = [],
   onCreateNote,
   onUpdateNote,
   onDeleteNote
@@ -253,7 +253,7 @@ function parseTimeToMinutes(timeStr) {
       )}
 
       {/* Google Keep Quick-Create Box */}
-      <RaidNoteQuickCreate onCreateNote={onCreateNote} raidNoteTitles={raidNoteTitles} supplierServices={supplierServices} />
+      <RaidNoteQuickCreate onCreateNote={onCreateNote} raidNoteTitles={raidNoteTitles} buyerPurchaseTypes={buyerPurchaseTypes} />
 
       {/* Modern Filter Toolbar */}
       <div className="space-y-3 p-3.5 rounded-xl bg-card/60 border border-border shadow-xs">
@@ -500,7 +500,7 @@ function parseTimeToMinutes(timeStr) {
                     key={note.id}
                     note={note}
                     raidNoteTitles={raidNoteTitles}
-                    supplierServices={supplierServices}
+                    buyerPurchaseTypes={buyerPurchaseTypes}
                     onUpdateNote={onUpdateNote}
                     onDeleteNote={onDeleteNote}
                   />
@@ -528,7 +528,7 @@ function parseTimeToMinutes(timeStr) {
                     key={note.id}
                     note={note}
                     raidNoteTitles={raidNoteTitles}
-                    supplierServices={supplierServices}
+                    buyerPurchaseTypes={buyerPurchaseTypes}
                     onUpdateNote={onUpdateNote}
                     onDeleteNote={onDeleteNote}
                   />

@@ -14,6 +14,7 @@ import {
   getSupplierGuildsList,
   updateSupplierGuilds,
   updateRaidNoteTitles,
+  updateBuyerPurchaseTypes,
   getSupplierWithdrawalsPayload,
   insertSupplierWithdrawal,
   getSupplierWithdrawalById,
@@ -1063,6 +1064,16 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { raidNoteTitles });
   }
 
+  if (pathname === "/api/prices/buyer-purchase-types" && req.method === "PUT") {
+    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change purchase types.");
+    if (!requireCsrf(req, res, session)) return;
+    const body = await readJson(req);
+    const cleaned = cleanPurchaseTypeRows(body.rows);
+    const buyerPurchaseTypes = await updateBuyerPurchaseTypes(cleaned);
+    incrementLedgerVersion();
+    return sendJson(res, 200, { buyerPurchaseTypes });
+  }
+
   if (pathname === "/api/prices/armor-types" && req.method === "PUT") {
     if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change armor stack options.");
     if (!requireCsrf(req, res, session)) return;
@@ -1449,6 +1460,29 @@ function cleanRaidTitleRows(rows) {
     const normalizedName = row.name.toLocaleLowerCase();
     if (seen.has(normalizedName)) {
       throw Object.assign(new Error("Duplicate raid note titles are not allowed."), { statusCode: 400 });
+    }
+    seen.add(normalizedName);
+  }
+  return cleaned;
+}
+
+function cleanPurchaseTypeRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw Object.assign(new Error("Keep at least one purchase type. Archive types that should no longer be used."), { statusCode: 400 });
+  }
+  const cleaned = rows.map((row) => ({
+    name: String(row.name || "").trim(),
+    active: row.active !== false,
+    isDefault: Boolean(row.isDefault)
+  }));
+  if (cleaned.some((row) => !row.name)) {
+    throw Object.assign(new Error("Every purchase type needs a name."), { statusCode: 400 });
+  }
+  const seen = new Set();
+  for (const row of cleaned) {
+    const normalizedName = row.name.toLocaleLowerCase();
+    if (seen.has(normalizedName)) {
+      throw Object.assign(new Error("Duplicate purchase types are not allowed."), { statusCode: 400 });
     }
     seen.add(normalizedName);
   }

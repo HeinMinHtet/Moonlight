@@ -41,8 +41,8 @@ const COLOR_MENU_ITEMS = [
   { id: "rose", label: "Rose" }
 ];
 
-export function RaidNoteCard({ note, raidNoteTitles = [], supplierServices = [], onUpdateNote, onDeleteNote }) {
-  const defaultPurchaseType = supplierServices.find((s) => s.isDefault && s.active !== false)?.type || (supplierServices.filter(s => s.active !== false)[0]?.type || "");
+export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [], onUpdateNote, onDeleteNote }) {
+  const defaultPurchaseType = buyerPurchaseTypes.find((s) => s.isDefault && s.active !== false)?.name || (buyerPurchaseTypes.filter(s => s.active !== false)[0]?.name || "");
   const [newBuyer, setNewBuyer] = useState("");
   const [newBuyerPurchaseType, setNewBuyerPurchaseType] = useState(defaultPurchaseType);
   const [editingItemId, setEditingItemId] = useState(null);
@@ -469,15 +469,15 @@ export function RaidNoteCard({ note, raidNoteTitles = [], supplierServices = [],
                     className="h-6 min-h-0 text-xs px-1.5 bg-background font-mono flex-1 min-w-0"
                     autoFocus
                   />
-                  {supplierServices.length > 0 && (
+                  {buyerPurchaseTypes.length > 0 && (
                     <NativeSelect
                       value={editingItemPurchaseType}
                       onChange={(e) => setEditingItemPurchaseType(e.target.value)}
                       className="h-6 min-h-0 text-[10px] px-1 bg-background w-[80px] shrink-0"
                     >
                       <option value="">None</option>
-                      {supplierServices.filter(s => s.active !== false).map((s) => (
-                        <option key={s.type} value={s.type}>{s.type}</option>
+                      {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
+                        <option key={s.name} value={s.name}>{s.name}</option>
                       ))}
                     </NativeSelect>
                   )}
@@ -563,14 +563,14 @@ export function RaidNoteCard({ note, raidNoteTitles = [], supplierServices = [],
             onKeyDown={handleKeyDown}
             className="h-7 text-xs font-mono bg-transparent border-none px-1 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60 flex-1 min-w-0"
           />
-          {supplierServices.length > 0 && (
+          {buyerPurchaseTypes.length > 0 && (
             <NativeSelect
               value={newBuyerPurchaseType}
               onChange={(e) => setNewBuyerPurchaseType(e.target.value)}
               className="h-7 text-[10px] px-1 bg-transparent border-none w-[90px] shrink-0"
             >
-              {supplierServices.filter(s => s.active !== false).map((s) => (
-                <option key={s.type} value={s.type}>{s.type}</option>
+              {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
+                <option key={s.name} value={s.name}>{s.name}</option>
               ))}
             </NativeSelect>
           )}
