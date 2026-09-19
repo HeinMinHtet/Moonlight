@@ -100,7 +100,7 @@ describe("RaidNotesPage", () => {
     const copyBuyerBtn = screen.getByRole("button", { name: "Copy Veliandina-tichondrius" });
     await user.click(copyBuyerBtn);
 
-    expect(writeTextSpy).toHaveBeenCalledWith("Veliandina-tichondrius");
+    expect(writeTextSpy).toHaveBeenCalledWith("Veliandina-tichondrius(VIP)");
   });
 
   it("toggles an active buyer item completed", async () => {
