@@ -80,10 +80,13 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
     e?.stopPropagation?.();
     const text = String(item?.text || "").trim();
     if (!text) return;
+    
+    const textToCopy = item.purchaseType ? `${text}(${item.purchaseType})` : text;
+    
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(textToCopy);
       setCopiedItemId(item.id);
-      toast.success(`Copied "${text}"`);
+      toast.success(`Copied "${textToCopy}"`);
       setTimeout(() => {
         setCopiedItemId((current) => (current === item.id ? null : current));
       }, 1800);
