@@ -464,19 +464,19 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
               )}
             >
               {editingItemId === item.id ? (
-                <div className="flex items-center gap-1.5 flex-1 w-full min-w-0">
+                <div className="flex items-center gap-1.5 flex-1 w-full min-w-0 bg-black/5 p-1 rounded-md border border-border/20">
                   <Input
                     value={editingItemText}
                     onChange={(e) => setEditingItemText(e.target.value)}
                     onKeyDown={(e) => handleEditItemKeyDown(e, item.id)}
-                    className="h-6 min-h-0 text-xs px-1.5 bg-background font-mono flex-1 min-w-0"
+                    className="h-6 min-h-0 text-xs px-1.5 bg-background font-mono flex-1 min-w-0 border-border/40 focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
                     autoFocus
                   />
                   {buyerPurchaseTypes.length > 0 && (
                     <NativeSelect
                       value={editingItemPurchaseType}
                       onChange={(e) => setEditingItemPurchaseType(e.target.value)}
-                      className="h-6 min-h-0 text-[10px] px-1 bg-background w-[80px] shrink-0"
+                      className="h-6 min-h-0 text-[10px] px-1 bg-background border-border/40 rounded w-[85px] shrink-0 focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
                     >
                       <option value="">None</option>
                       {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
@@ -556,21 +556,21 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
         })}
 
         {/* Rapid Inline Add Input */}
-        <div className="flex items-center gap-2 pt-1">
-          <Plus className="size-3.5 text-muted-foreground shrink-0 ml-1" />
+        <div className="group flex items-center gap-2 mt-2 px-2 py-1 bg-black/5 hover:bg-black/10 focus-within:bg-black/10 border border-transparent focus-within:border-border/30 rounded-md transition-colors">
+          <Plus className="size-3.5 text-muted-foreground shrink-0" />
           <Input
             ref={inputRef}
             placeholder="Add buyer (hit Enter)..."
             value={newBuyer}
             onChange={(e) => setNewBuyer(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="h-7 text-xs font-mono bg-transparent border-none px-1 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60 flex-1 min-w-0"
+            className="h-7 text-xs font-mono bg-transparent border-none px-0 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60 flex-1 min-w-0"
           />
           {buyerPurchaseTypes.length > 0 && (
             <NativeSelect
               value={newBuyerPurchaseType}
               onChange={(e) => setNewBuyerPurchaseType(e.target.value)}
-              className="h-7 text-[10px] px-1 bg-transparent border-none w-[90px] shrink-0"
+              className="h-6 min-h-0 text-[10px] px-1.5 font-medium bg-background/60 hover:bg-background/90 border border-border/40 rounded w-[90px] shrink-0 focus-visible:ring-1 focus-visible:ring-primary shadow-sm transition-colors"
             >
               {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
                 <option key={s.name} value={s.name}>{s.name}</option>
@@ -581,9 +581,9 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
             <Button
               type="button"
               size="sm"
-              variant="ghost"
+              variant="secondary"
               onClick={handleAddBuyer}
-              className="h-6 text-[11px] px-2 text-primary shrink-0"
+              className="h-6 text-[10px] px-2 shrink-0 bg-primary/10 text-primary hover:bg-primary/20"
             >
               Add
             </Button>
