@@ -14,7 +14,7 @@ const sampleNotes = [
     pinned: true,
     archived: false,
     items: [
-      { id: "item-1", text: "Veliandina-tichondrius", completed: false },
+      { id: "item-1", text: "Veliandina-tichondrius", purchaseType: "VIP", completed: false },
       { id: "item-2", text: "Squatchlace-Tichondrius", completed: false }
     ]
   },
@@ -88,7 +88,7 @@ describe("RaidNotesPage", () => {
     await user.click(copyButtons[0]);
 
     expect(writeTextSpy).toHaveBeenCalledWith(
-      "Heroic 8/8 10 am\nVeliandina-tichondrius\nSquatchlace-Tichondrius"
+      "Heroic 8/8 10 am\nVeliandina-tichondrius(VIP)\nSquatchlace-Tichondrius"
     );
   });
 
@@ -113,7 +113,7 @@ describe("RaidNotesPage", () => {
 
     expect(onUpdateNote).toHaveBeenCalledWith("note-1", {
       items: [
-        { id: "item-1", text: "Veliandina-tichondrius", completed: true },
+        { id: "item-1", text: "Veliandina-tichondrius", purchaseType: "VIP", completed: true },
         { id: "item-2", text: "Squatchlace-Tichondrius", completed: false }
       ]
     });
@@ -244,7 +244,7 @@ describe("RaidNotesPage", () => {
     expect(onCreateNote).toHaveBeenCalled();
     const callArg = onCreateNote.mock.calls[0][0];
     expect(callArg.title).toBe("Heroic 6/8 10pm +11:59pm");
-    expect(callArg.items).toEqual([{ text: "saouri-illidan", completed: false }]);
+    expect(callArg.items).toEqual([{ text: "saouri-illidan", purchaseType: "", completed: false }]);
   });
 });
 

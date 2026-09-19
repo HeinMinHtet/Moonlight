@@ -610,6 +610,7 @@ export function App() {
             loadError={loadError}
             notes={data.raidNotes}
             raidNoteTitles={data.raidNoteTitles}
+            supplierServices={data.supplierServices}
             onCreateNote={createRaidNote}
             onUpdateNote={patchRaidNote}
             onDeleteNote={deleteRaidNote}

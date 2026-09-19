@@ -41,8 +41,13 @@ const COLOR_MENU_ITEMS = [
   { id: "rose", label: "Rose" }
 ];
 
-export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDeleteNote }) {
+export function RaidNoteCard({ note, raidNoteTitles = [], supplierServices = [], onUpdateNote, onDeleteNote }) {
+  const defaultPurchaseType = supplierServices.find((s) => s.isDefault && s.active !== false)?.type || (supplierServices.filter(s => s.active !== false)[0]?.type || "");
   const [newBuyer, setNewBuyer] = useState("");
+  const [newBuyerPurchaseType, setNewBuyerPurchaseType] = useState(defaultPurchaseType);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editingItemText, setEditingItemText] = useState("");
+  const [editingItemPurchaseType, setEditingItemPurchaseType] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedItemId, setCopiedItemId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -95,6 +100,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDelete
     const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     const newItems = lines.map((text) => ({
       text,
+      purchaseType: newBuyerPurchaseType,
       completed: false
     }));
 
@@ -102,6 +108,36 @@ export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDelete
     await onUpdateNote(note.id, { items: updatedItems });
     setNewBuyer("");
     inputRef.current?.focus();
+  };
+
+  const handleStartEditItem = (item) => {
+    setEditingItemId(item.id);
+    setEditingItemText(item.text);
+    setEditingItemPurchaseType(item.purchaseType || defaultPurchaseType);
+  };
+
+  const handleCancelEditItem = () => {
+    setEditingItemId(null);
+  };
+
+  const handleSaveEditItem = async (itemId) => {
+    const trimmed = editingItemText.trim();
+    if (!trimmed) {
+      handleCancelEditItem();
+      return;
+    }
+    const updatedItems = items.map((item) => (item.id === itemId ? { ...item, text: trimmed, purchaseType: editingItemPurchaseType } : item));
+    await onUpdateNote(note.id, { items: updatedItems });
+    setEditingItemId(null);
+  };
+
+  const handleEditItemKeyDown = (e, itemId) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveEditItem(itemId);
+    } else if (e.key === "Escape") {
+      handleCancelEditItem();
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -125,7 +161,12 @@ export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDelete
       header = `${title} ${time}`;
     }
 
-    const buyerLines = items.map((item) => item.text).filter(Boolean);
+    const buyerLines = items
+      .map((item) => {
+        if (!item.text) return "";
+        return item.purchaseType ? `${item.text}(${item.purchaseType})` : item.text;
+      })
+      .filter(Boolean);
     const textToCopy = buyerLines.length > 0 ? `${header}\n${buyerLines.join("\n")}` : header;
 
     try {
@@ -419,47 +460,94 @@ export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDelete
                 isDone && "opacity-60"
               )}
             >
-              <label
-                className={cn(
-                  "flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none",
-                  isDone && "line-through text-muted-foreground"
-                )}
-              >
-                <Checkbox
-                  checked={isDone}
-                  onCheckedChange={(checked) => handleToggleItem(item.id, Boolean(checked))}
-                  className="size-4 shrink-0"
-                />
-                <span className="text-xs font-mono truncate">{item.text}</span>
-              </label>
+              {editingItemId === item.id ? (
+                <div className="flex items-center gap-1.5 flex-1 w-full min-w-0">
+                  <Input
+                    value={editingItemText}
+                    onChange={(e) => setEditingItemText(e.target.value)}
+                    onKeyDown={(e) => handleEditItemKeyDown(e, item.id)}
+                    className="h-6 min-h-0 text-xs px-1.5 bg-background font-mono flex-1 min-w-0"
+                    autoFocus
+                  />
+                  {supplierServices.length > 0 && (
+                    <NativeSelect
+                      value={editingItemPurchaseType}
+                      onChange={(e) => setEditingItemPurchaseType(e.target.value)}
+                      className="h-6 min-h-0 text-[10px] px-1 bg-background w-[80px] shrink-0"
+                    >
+                      <option value="">None</option>
+                      {supplierServices.filter(s => s.active !== false).map((s) => (
+                        <option key={s.type} value={s.type}>{s.type}</option>
+                      ))}
+                    </NativeSelect>
+                  )}
+                  <Button type="button" size="icon" variant="ghost" onClick={() => handleSaveEditItem(item.id)} className="size-6 text-primary hover:bg-black/15">
+                    <Check className="size-3" />
+                  </Button>
+                  <Button type="button" size="icon" variant="ghost" onClick={handleCancelEditItem} className="size-6 text-muted-foreground hover:bg-black/15">
+                    <X className="size-3" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <label
+                    className={cn(
+                      "flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none",
+                      isDone && "line-through text-muted-foreground"
+                    )}
+                  >
+                    <Checkbox
+                      checked={isDone}
+                      onCheckedChange={(checked) => handleToggleItem(item.id, Boolean(checked))}
+                      className="size-4 shrink-0"
+                    />
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className="text-xs font-mono truncate">{item.text}</span>
+                      {item.purchaseType && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 shrink-0 font-medium whitespace-nowrap bg-background/30">
+                          {item.purchaseType}
+                        </Badge>
+                      )}
+                    </div>
+                  </label>
 
-              <div className="flex items-center gap-0.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => handleCopyBuyerName(item, e)}
-                  className={cn(
-                    "p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/15 transition-colors",
-                    copiedItemId === item.id && "text-emerald-400 hover:text-emerald-400"
-                  )}
-                  title={`Copy ${item.text}`}
-                  aria-label={`Copy ${item.text}`}
-                >
-                  {copiedItemId === item.id ? (
-                    <Check className="size-3 text-emerald-400" />
-                  ) : (
-                    <Copy className="size-3" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="p-1 rounded text-muted-foreground/50 hover:text-destructive hover:bg-black/15 opacity-0 group-hover/item:opacity-100 transition-opacity"
-                  title="Delete item"
-                  aria-label={`Delete ${item.text}`}
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); handleStartEditItem(item); }}
+                      className="p-1 rounded text-muted-foreground/60 hover:text-primary hover:bg-black/15 transition-colors"
+                      title="Edit item"
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyBuyerName(item, e)}
+                      className={cn(
+                        "p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/15 transition-colors opacity-100",
+                        copiedItemId === item.id && "text-emerald-400 hover:text-emerald-400"
+                      )}
+                      title={`Copy ${item.text}`}
+                      aria-label={`Copy ${item.text}`}
+                    >
+                      {copiedItemId === item.id ? (
+                        <Check className="size-3 text-emerald-400" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(item.id)}
+                      className="p-1 rounded text-muted-foreground/50 hover:text-destructive hover:bg-black/15"
+                      title="Delete item"
+                      aria-label={`Delete ${item.text}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
@@ -473,15 +561,26 @@ export function RaidNoteCard({ note, raidNoteTitles = [], onUpdateNote, onDelete
             value={newBuyer}
             onChange={(e) => setNewBuyer(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="h-7 text-xs font-mono bg-transparent border-none px-1 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60"
+            className="h-7 text-xs font-mono bg-transparent border-none px-1 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60 flex-1 min-w-0"
           />
+          {supplierServices.length > 0 && (
+            <NativeSelect
+              value={newBuyerPurchaseType}
+              onChange={(e) => setNewBuyerPurchaseType(e.target.value)}
+              className="h-7 text-[10px] px-1 bg-transparent border-none w-[90px] shrink-0"
+            >
+              {supplierServices.filter(s => s.active !== false).map((s) => (
+                <option key={s.type} value={s.type}>{s.type}</option>
+              ))}
+            </NativeSelect>
+          )}
           {newBuyer.trim() && (
             <Button
               type="button"
               size="sm"
               variant="ghost"
               onClick={handleAddBuyer}
-              className="h-6 text-[11px] px-2 text-primary"
+              className="h-6 text-[11px] px-2 text-primary shrink-0"
             >
               Add
             </Button>

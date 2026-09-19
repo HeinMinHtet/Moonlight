@@ -15,8 +15,9 @@ const COLOR_OPTIONS = [
   { id: "rose", label: "Rose", bg: "bg-rose-950/40 border-rose-500/40 text-rose-300" }
 ];
 
-export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
+export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], supplierServices = [] }) {
   const defaultTitle = raidNoteTitles.find((t) => t.isDefault)?.name || (raidNoteTitles[0]?.name || "");
+  const defaultPurchaseType = supplierServices.find((s) => s.isDefault && s.active !== false)?.type || (supplierServices.filter(s => s.active !== false)[0]?.type || "");
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState(defaultTitle);
   const [raidDate, setRaidDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -25,6 +26,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
   const [pinned, setPinned] = useState(false);
   const [buyers, setBuyers] = useState([]);
   const [buyerInput, setBuyerInput] = useState("");
+  const [buyerPurchaseType, setBuyerPurchaseType] = useState(defaultPurchaseType);
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +43,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
   const handleAddBuyer = () => {
     const trimmed = buyerInput.trim();
     if (!trimmed) return;
-    setBuyers((prev) => [...prev, { text: trimmed, completed: false }]);
+    setBuyers((prev) => [...prev, { text: trimmed, purchaseType: buyerPurchaseType, completed: false }]);
     setBuyerInput("");
     buyerInputRef.current?.focus();
   };
@@ -63,7 +65,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
       .map((line) => line.trim())
       .filter(Boolean);
     if (lines.length > 0) {
-      setBuyers((prev) => [...prev, ...lines.map((text) => ({ text, completed: false }))]);
+      setBuyers((prev) => [...prev, ...lines.map((text) => ({ text, purchaseType: buyerPurchaseType, completed: false }))]);
     }
     setBulkText("");
     setBulkMode(false);
@@ -77,6 +79,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
     setPinned(false);
     setBuyers([]);
     setBuyerInput("");
+    setBuyerPurchaseType(defaultPurchaseType);
     setBulkMode(false);
     setBulkText("");
     setExpanded(false);
@@ -89,7 +92,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
 
     let finalBuyers = [...buyers];
     if (buyerInput.trim()) {
-      finalBuyers.push({ text: buyerInput.trim(), completed: false });
+      finalBuyers.push({ text: buyerInput.trim(), purchaseType: buyerPurchaseType, completed: false });
     }
 
     setSubmitting(true);
@@ -238,6 +241,17 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
               onKeyDown={handleBuyerKeyDown}
               className="h-9 text-xs bg-field/80 border-border flex-1 font-mono"
             />
+            {supplierServices.length > 0 && (
+              <NativeSelect
+                value={buyerPurchaseType}
+                onChange={(e) => setBuyerPurchaseType(e.target.value)}
+                className="h-9 text-xs bg-field/80 border-border w-[110px]"
+              >
+                {supplierServices.filter(s => s.active !== false).map((s) => (
+                  <option key={s.type} value={s.type}>{s.type}</option>
+                ))}
+              </NativeSelect>
+            )}
             <Button
               type="button"
               size="sm"
@@ -259,9 +273,14 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [] }) {
                 key={idx}
                 className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-field/60 border border-border/50 text-xs font-mono"
               >
-                <div className="flex items-center gap-2 truncate">
+                <div className="flex items-center gap-2 truncate flex-1">
                   <span className="size-1.5 rounded-full bg-primary/70 shrink-0" />
-                  <span className="truncate">{buyer.text}</span>
+                  <span className="truncate flex-1">{buyer.text}</span>
+                  {buyer.purchaseType && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 font-medium">
+                      {buyer.purchaseType}
+                    </Badge>
+                  )}
                 </div>
                 <button
                   type="button"
