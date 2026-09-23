@@ -81,7 +81,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
     const text = String(item?.text || "").trim();
     if (!text) return;
     
-    const textToCopy = item.purchaseType ? `${text}(${item.purchaseType})` : text;
+    const textToCopy = text;
     
     try {
       await navigator.clipboard.writeText(textToCopy);
@@ -469,14 +469,14 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
                     value={editingItemText}
                     onChange={(e) => setEditingItemText(e.target.value)}
                     onKeyDown={(e) => handleEditItemKeyDown(e, item.id)}
-                    className="h-6 min-h-0 text-xs px-1.5 bg-background font-mono flex-1 min-w-0 border-border/40 focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
+                    className="h-8 min-h-0 text-sm px-2 bg-background font-mono flex-1 min-w-0 border-border/40 focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
                     autoFocus
                   />
                   {buyerPurchaseTypes.length > 0 && (
                     <NativeSelect
                       value={editingItemPurchaseType}
                       onChange={(e) => setEditingItemPurchaseType(e.target.value)}
-                      className="h-6 min-h-0 text-[10px] px-1 bg-background border-border/40 rounded w-[85px] shrink-0 focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
+                      className="h-8 min-h-0 text-xs px-2 bg-background border-border/40 rounded w-[100px] shrink-0 focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
                     >
                       <option value="">None</option>
                       {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
@@ -484,11 +484,11 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
                       ))}
                     </NativeSelect>
                   )}
-                  <Button type="button" size="icon" variant="ghost" onClick={() => handleSaveEditItem(item.id)} className="size-6 text-primary hover:bg-black/15">
-                    <Check className="size-3" />
+                  <Button type="button" size="icon" variant="ghost" onClick={() => handleSaveEditItem(item.id)} className="size-8 text-primary hover:bg-black/15">
+                    <Check className="size-4" />
                   </Button>
-                  <Button type="button" size="icon" variant="ghost" onClick={handleCancelEditItem} className="size-6 text-muted-foreground hover:bg-black/15">
-                    <X className="size-3" />
+                  <Button type="button" size="icon" variant="ghost" onClick={handleCancelEditItem} className="size-8 text-muted-foreground hover:bg-black/15">
+                    <X className="size-4" />
                   </Button>
                 </div>
               ) : (
@@ -505,9 +505,9 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
                       className="size-4 shrink-0"
                     />
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span className="text-xs font-mono truncate">{item.text}</span>
+                      <span className="text-sm font-mono truncate">{item.text}</span>
                       {item.purchaseType && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 shrink-0 font-medium whitespace-nowrap bg-background/30">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0 font-medium whitespace-nowrap bg-background/30">
                           {item.purchaseType}
                         </Badge>
                       )}
@@ -518,35 +518,35 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); handleStartEditItem(item); }}
-                      className="p-1 rounded text-muted-foreground/60 hover:text-primary hover:bg-black/15 transition-colors"
+                      className="p-1.5 rounded text-muted-foreground/60 hover:text-primary hover:bg-black/15 transition-colors"
                       title="Edit item"
                     >
-                      <Pencil className="size-3" />
+                      <Pencil className="size-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={(e) => handleCopyBuyerName(item, e)}
                       className={cn(
-                        "p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/15 transition-colors opacity-100",
+                        "p-1.5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/15 transition-colors opacity-100",
                         copiedItemId === item.id && "text-emerald-400 hover:text-emerald-400"
                       )}
                       title={`Copy ${item.text}`}
                       aria-label={`Copy ${item.text}`}
                     >
                       {copiedItemId === item.id ? (
-                        <Check className="size-3 text-emerald-400" />
+                        <Check className="size-3.5 text-emerald-400" />
                       ) : (
-                        <Copy className="size-3" />
+                        <Copy className="size-3.5" />
                       )}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(item.id)}
-                      className="p-1 rounded text-muted-foreground/50 hover:text-destructive hover:bg-black/15"
+                      className="p-1.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-black/15"
                       title="Delete item"
                       aria-label={`Delete ${item.text}`}
                     >
-                      <X className="size-3" />
+                      <X className="size-3.5" />
                     </button>
                   </div>
                 </>
@@ -556,21 +556,21 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
         })}
 
         {/* Rapid Inline Add Input */}
-        <div className="group flex items-center gap-2 mt-2 px-2 py-1 bg-black/5 hover:bg-black/10 focus-within:bg-black/10 border border-transparent focus-within:border-border/30 rounded-md transition-colors">
-          <Plus className="size-3.5 text-muted-foreground shrink-0" />
+        <div className="group flex items-center gap-2 mt-2 px-2 py-1.5 bg-black/5 hover:bg-black/10 focus-within:bg-black/10 border border-transparent focus-within:border-border/30 rounded-md transition-colors">
+          <Plus className="size-4 text-muted-foreground shrink-0" />
           <Input
             ref={inputRef}
             placeholder="Add buyer (hit Enter)..."
             value={newBuyer}
             onChange={(e) => setNewBuyer(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="h-7 text-xs font-mono bg-transparent border-none px-0 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60 flex-1 min-w-0"
+            className="h-8 text-sm font-mono bg-transparent border-none px-0 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60 flex-1 min-w-0"
           />
           {buyerPurchaseTypes.length > 0 && (
             <NativeSelect
               value={newBuyerPurchaseType}
               onChange={(e) => setNewBuyerPurchaseType(e.target.value)}
-              className="h-6 min-h-0 text-[10px] px-1.5 font-medium bg-background/60 hover:bg-background/90 border border-border/40 rounded w-[90px] shrink-0 focus-visible:ring-1 focus-visible:ring-primary shadow-sm transition-colors"
+              className="h-8 min-h-0 text-xs px-2 font-medium bg-background/60 hover:bg-background/90 border border-border/40 rounded w-[100px] shrink-0 focus-visible:ring-1 focus-visible:ring-primary shadow-sm transition-colors"
             >
               {buyerPurchaseTypes.filter(s => s.active !== false).map((s) => (
                 <option key={s.name} value={s.name}>{s.name}</option>
@@ -583,7 +583,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
               size="sm"
               variant="secondary"
               onClick={handleAddBuyer}
-              className="h-6 text-[10px] px-2 shrink-0 bg-primary/10 text-primary hover:bg-primary/20"
+              className="h-8 text-xs px-3 shrink-0 bg-primary/10 text-primary hover:bg-primary/20"
             >
               Add
             </Button>
