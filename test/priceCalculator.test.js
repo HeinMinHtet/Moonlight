@@ -42,20 +42,20 @@ test("calculateTieredDiscounts handles 0, negative, or invalid price safely", ()
 
 test("formatCalculationOutput generates clean copyable text with only service name and final result", () => {
   const items = [
-    { serviceName: "M+ 10", originalPrice: 100 },
-    { serviceName: "Heroic Raid", originalPrice: 200 }
+    { serviceName: "M+ 10", originalPrice: 100, discount1Pct: 10, discount2Pct: 10 },
+    { serviceName: "Heroic Raid", originalPrice: 200, discount1Pct: 10, discount2Pct: 10 }
   ];
 
-  const listText = formatCalculationOutput(items, { discount1Pct: 10, discount2Pct: 10, format: "list" });
+  const listText = formatCalculationOutput(items, { format: "list" });
   assert.equal(listText, "M+ 10: 81\nHeroic Raid: 162");
 
-  const bulletText = formatCalculationOutput(items, { discount1Pct: 10, discount2Pct: 10, format: "bullet" });
+  const bulletText = formatCalculationOutput(items, { format: "bullet" });
   assert.equal(bulletText, "• M+ 10: 81\n• Heroic Raid: 162");
 
-  const dashText = formatCalculationOutput(items, { discount1Pct: 10, discount2Pct: 10, format: "dash" });
+  const dashText = formatCalculationOutput(items, { format: "dash" });
   assert.equal(dashText, "M+ 10 - 81\nHeroic Raid - 162");
 
-  const tableText = formatCalculationOutput(items, { discount1Pct: 10, discount2Pct: 10, format: "table" });
+  const tableText = formatCalculationOutput(items, { format: "table" });
   assert.ok(tableText.includes("Service"));
   assert.ok(tableText.includes("Final Price"));
   assert.ok(tableText.includes("M+ 10"));

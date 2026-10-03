@@ -11,31 +11,31 @@ import { cn } from "@/lib/utils.js";
 import { toast as notify } from "sonner";
 
 const DEFAULT_ROWS = [
-  { id: "example-1", serviceName: "Mythic+ 10", originalPrice: 100 },
-  { id: "example-2", serviceName: "Mythic+ 12", originalPrice: 150 },
-  { id: "example-3", serviceName: "Heroic Raid Full Clear", originalPrice: 300 }
+  { id: "example-1", serviceName: "Mythic+ 10", originalPrice: 100, discount1Pct: 10, discount2Pct: 10 },
+  { id: "example-2", serviceName: "Mythic+ 12", originalPrice: 150, discount1Pct: 10, discount2Pct: 10 },
+  { id: "example-3", serviceName: "Heroic Raid Full Clear", originalPrice: 300, discount1Pct: 10, discount2Pct: 10 }
 ];
 
 export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
   if (!isAdmin) return <AccessDenied />;
 
   const [rows, setRows] = useState(DEFAULT_ROWS);
-  const [discount1Pct, setDiscount1Pct] = useState(10);
-  const [discount2Pct, setDiscount2Pct] = useState(10);
   const [outputFormat, setOutputFormat] = useState("list");
   const [copied, setCopied] = useState(false);
-  const tier1InputId = useId();
-  const tier2InputId = useId();
   const copyAreaId = useId();
 
-  // Calculate items with tiered discounts
+  // Calculate items with tiered discounts per row
   const calculatedItems = useMemo(() => {
     return rows.map((row) => {
-      const calc = calculateTieredDiscounts(row.originalPrice, discount1Pct, discount2Pct);
+      const d1 = row.discount1Pct !== undefined ? row.discount1Pct : 0;
+      const d2 = row.discount2Pct !== undefined ? row.discount2Pct : 0;
+      const calc = calculateTieredDiscounts(row.originalPrice, d1, d2);
       return {
         id: row.id,
         serviceName: row.serviceName,
         originalPrice: calc.originalPrice,
+        discount1Pct: d1,
+        discount2Pct: d2,
         discountedPrice1: calc.discountedPrice1,
         discountedPrice2: calc.discountedPrice2,
         discount1Amount: calc.discount1Amount,
@@ -43,7 +43,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
         totalDiscountAmount: calc.totalDiscountAmount
       };
     });
-  }, [rows, discount1Pct, discount2Pct]);
+  }, [rows]);
 
   // Overall totals
   const totals = useMemo(() => {
@@ -62,15 +62,13 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
   // Formatted copyable text
   const copyableText = useMemo(() => {
     return formatCalculationOutput(calculatedItems, {
-      discount1Pct,
-      discount2Pct,
       format: outputFormat
     });
-  }, [calculatedItems, discount1Pct, discount2Pct, outputFormat]);
+  }, [calculatedItems, outputFormat]);
 
   const handleAddRow = () => {
     const newId = `row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    setRows((current) => [...current, { id: newId, serviceName: "", originalPrice: 0 }]);
+    setRows((current) => [...current, { id: newId, serviceName: "", originalPrice: 0, discount1Pct: 10, discount2Pct: 10 }]);
   };
 
   const handleUpdateRow = (id, field, value) => {
@@ -85,8 +83,6 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
 
   const handleResetExample = () => {
     setRows(DEFAULT_ROWS);
-    setDiscount1Pct(10);
-    setDiscount2Pct(10);
     notify("Reset calculator to example values.");
   };
 
@@ -104,7 +100,9 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
     const importedRows = activeServices.map((s, idx) => ({
       id: `imported-${idx}-${Date.now()}`,
       serviceName: s.type || `Service ${idx + 1}`,
-      originalPrice: Number(s.price || 0)
+      originalPrice: Number(s.price || 0),
+      discount1Pct: 10,
+      discount2Pct: 10
     }));
     setRows(importedRows);
     notify(`Imported ${importedRows.length} active service rates.`);
@@ -135,7 +133,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
             <Badge variant="admin">Admin tool</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Calculate tiered discounts: Initial {discount1Pct}% discount, followed by an additional {discount2Pct}% discount on the discounted price.
+            Calculate tiered discounts per service row.
           </p>
         </div>
 
@@ -176,54 +174,6 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
         </div>
       </header>
 
-      {/* Discount Rate Settings Bar */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 border border-border/70 bg-card/80 p-3 shadow-xs">
-        <div className="flex flex-wrap items-center gap-4 text-xs">
-          <span className="font-semibold text-foreground flex items-center gap-1.5">
-            <Calculator className="size-4 text-primary" aria-hidden="true" />
-            Discount percentages:
-          </span>
-          <div className="flex items-center gap-1.5">
-            <label htmlFor={tier1InputId} className="text-muted-foreground">Tier 1:</label>
-            <div className="relative">
-              <Input
-                id={tier1InputId}
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
-                value={discount1Pct}
-                onChange={(e) => setDiscount1Pct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                aria-label="Tier 1 discount percentage"
-                className="h-7 w-16 px-2 text-right font-mono text-xs pr-5"
-              />
-              <span className="absolute right-1.5 top-1.5 text-xs text-muted-foreground pointer-events-none">%</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label htmlFor={tier2InputId} className="text-muted-foreground">Tier 2 (Extra):</label>
-            <div className="relative">
-              <Input
-                id={tier2InputId}
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
-                value={discount2Pct}
-                onChange={(e) => setDiscount2Pct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                aria-label="Tier 2 discount percentage"
-                className="h-7 w-16 px-2 text-right font-mono text-xs pr-5"
-              />
-              <span className="absolute right-1.5 top-1.5 text-xs text-muted-foreground pointer-events-none">%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-xs text-muted-foreground">
-          Formula: <span className="font-mono text-foreground font-medium">Original × (1 - {discount1Pct}%) × (1 - {discount2Pct}%)</span>
-        </div>
-      </Card>
-
       {/* Main Grid: Calculator Table + Copyable Output Box */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         {/* Left Column: Calculation Table (7 cols on XL) */}
@@ -231,7 +181,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
           <div className="section-head flex items-center justify-between border-b border-border/70 p-4">
             <div>
               <h3 className="text-base font-bold text-foreground">Service Price Rows</h3>
-              <p className="text-xs text-muted-foreground">Enter service names and original prices to see live discounted rates.</p>
+              <p className="text-xs text-muted-foreground">Enter service names, original prices, and discounts to see live rates.</p>
             </div>
             <Button
               variant="secondary"
@@ -251,12 +201,13 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
               {/* Header */}
               <div
                 className="rate-table-header grid items-center gap-2 border-b border-border/80 bg-muted/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"
-                style={{ gridTemplateColumns: "minmax(140px, 1fr) 110px 115px 125px 44px" }}
+                style={{ gridTemplateColumns: "minmax(140px, 1fr) 110px 80px 80px 115px 44px" }}
               >
                 <span>Service Name</span>
                 <span className="text-right">Original</span>
-                <span className="text-right text-sky-400">-{discount1Pct}% Off</span>
-                <span className="text-right text-amber-400">-{discount2Pct}% Extra</span>
+                <span className="text-right">Tier 1</span>
+                <span className="text-right">Tier 2</span>
+                <span className="text-right text-amber-400">Final Price</span>
                 <span className="text-center">Action</span>
               </div>
 
@@ -275,7 +226,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                     <div
                       key={item.id}
                       className="rate-table-row grid items-center gap-2 px-3 py-2 transition-colors hover:bg-muted/20"
-                      style={{ gridTemplateColumns: "minmax(140px, 1fr) 110px 115px 125px 44px" }}
+                      style={{ gridTemplateColumns: "minmax(140px, 1fr) 110px 80px 80px 115px 44px" }}
                     >
                       {/* Service Name */}
                       <div className="min-w-0">
@@ -303,13 +254,49 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                       </div>
 
                       {/* Tier 1 Discount */}
-                      <div className="text-right font-mono text-xs sm:text-sm font-semibold text-sky-300 pr-1">
-                        {money(item.discountedPrice1)}
+                      <div>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={item.discount1Pct !== undefined ? item.discount1Pct : ""}
+                            onChange={(e) => handleUpdateRow(item.id, "discount1Pct", Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                            placeholder="0"
+                            aria-label="Tier 1 discount percentage"
+                            className="h-8 text-xs sm:text-sm px-2.5 text-right font-mono bg-popover/80 rounded-lg pr-6"
+                          />
+                          <span className="absolute right-2 top-1.5 text-xs text-muted-foreground pointer-events-none">%</span>
+                        </div>
                       </div>
 
-                      {/* Tier 2 Discount (Extra) */}
-                      <div className="text-right font-mono text-xs sm:text-sm font-bold text-amber-300 pr-1">
-                        {money(item.discountedPrice2)}
+                      {/* Tier 2 Discount */}
+                      <div>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={item.discount2Pct !== undefined ? item.discount2Pct : ""}
+                            onChange={(e) => handleUpdateRow(item.id, "discount2Pct", Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                            placeholder="0"
+                            aria-label="Tier 2 discount percentage"
+                            className="h-8 text-xs sm:text-sm px-2.5 text-right font-mono bg-popover/80 rounded-lg pr-6"
+                          />
+                          <span className="absolute right-2 top-1.5 text-xs text-muted-foreground pointer-events-none">%</span>
+                        </div>
+                      </div>
+
+                      {/* Final Price */}
+                      <div className="flex flex-col text-right font-mono pr-1">
+                        <span className="text-xs text-sky-300 font-semibold line-through opacity-70">
+                          {money(item.discountedPrice1)}
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-amber-300">
+                          {money(item.discountedPrice2)}
+                        </span>
                       </div>
 
                       {/* Action */}
@@ -339,7 +326,6 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
               <span className="text-muted-foreground">{calculatedItems.length} service row{calculatedItems.length === 1 ? "" : "s"}</span>
               <div className="flex items-center gap-4 font-mono">
                 <span>Orig Total: <strong className="text-foreground">{money(totals.original)}</strong></span>
-                <span>Tier 1 Total: <strong className="text-sky-300">{money(totals.tier1)}</strong></span>
                 <span>Final Total: <strong className="text-amber-300">{money(totals.tier2)}</strong></span>
               </div>
             </div>

@@ -46,7 +46,7 @@ export function calculateTieredDiscounts(originalPrice, discount1Pct = 10, disco
  * @returns {string} Formatted text ready for copying to clipboard
  */
 export function formatCalculationOutput(items = [], options = {}) {
-  const { discount1Pct = 10, discount2Pct = 10, format = "list" } = options;
+  const { format = "list" } = options;
   const validItems = items.filter((item) => String(item.serviceName || "").trim() || Number(item.originalPrice) > 0);
 
   if (validItems.length === 0) {
@@ -55,7 +55,9 @@ export function formatCalculationOutput(items = [], options = {}) {
 
   const calculatedRows = validItems.map((item) => {
     const name = String(item.serviceName || "Unnamed service").trim();
-    const calculations = calculateTieredDiscounts(item.originalPrice, discount1Pct, discount2Pct);
+    const d1 = item.discount1Pct !== undefined ? item.discount1Pct : 0;
+    const d2 = item.discount2Pct !== undefined ? item.discount2Pct : 0;
+    const calculations = calculateTieredDiscounts(item.originalPrice, d1, d2);
     return { name, ...calculations };
   });
 
