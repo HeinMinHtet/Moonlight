@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BoosterBalanceTab } from "./BoosterBalanceTab.jsx";
 import { BoosterRecordForm } from "./BoosterRecordForm.jsx";
 import { BoosterRecordsTable } from "./BoosterRecordsTable.jsx";
+import { BoosterSettlementsTable } from "./BoosterSettlementsTable.jsx";
 import { mmk, money } from "../../utils/format.js";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
@@ -64,6 +65,18 @@ export function BoosterPayoutPage({
     () => records.filter((record) => matchesFilters(record, filters)),
     [records, filters]
   );
+  
+  const filteredSettlements = useMemo(() => {
+    return vaultTransactions.filter((tx) => {
+      if (tx.type !== "direct_payout" && !(tx.type === "deposit" && tx.settlementBatchId)) return false;
+      if (filters.booster !== "all" && tx.boosterName !== filters.booster) return false;
+      const txDate = String(tx.createdAt || tx.date || "").slice(0, 10);
+      if (filters.dateFrom && txDate < filters.dateFrom) return false;
+      if (filters.dateTo && txDate > filters.dateTo) return false;
+      return true;
+    });
+  }, [vaultTransactions, filters]);
+
   const visibleOpenRows = useMemo(() => filteredRecords.filter((record) => !record.paid), [filteredRecords]);
   const selectedRows = useMemo(
     () => visibleOpenRows.filter((record) => selectedIds.has(record.id)),
@@ -122,7 +135,7 @@ export function BoosterPayoutPage({
   };
 
   useEffect(() => {
-    if (!isAdmin && (filters.view === "all" || filters.view === "balances")) {
+    if (!isAdmin && (filters.view === "all" || filters.view === "balances" || filters.view === "cleared")) {
       updateFilter("view", "open");
     }
   }, [filters.view, isAdmin]);
@@ -261,7 +274,8 @@ export function BoosterPayoutPage({
                 ...(isAdmin
                   ? [
                       ["all", "All records"],
-                      ["balances", "Booster balances & Vault"]
+                      ["balances", "Booster balances & Vault"],
+                      ["cleared", "Run Cleared History"]
                     ]
                   : [["vault", "My Stored Cash (MMK)"]])
               ].map(([value, label]) => (
@@ -467,7 +481,7 @@ export function BoosterPayoutPage({
                     </Button>
                   </section>
 
-                  {filters.view !== "paid" && (
+                  {filters.view !== "paid" && filters.view !== "cleared" && (
                     <BoosterRecordForm
                       key={formKey}
                       disabled={!permissions.canUseBooster || !activePrices.length}
@@ -477,22 +491,29 @@ export function BoosterPayoutPage({
                       onSubmit={onSubmitRecord}
                     />
                   )}
-                  <BoosterRecordsTable
-                    records={filteredRecords}
-                    prices={activePrices}
-                    user={user}
-                    isAdmin={isAdmin}
-                    permissions={permissions}
-                    editing={editing}
-                    selectedIds={selectedIds}
-                    visibleOpenRows={visibleOpenRows}
-                    emptyMessage={emptyMessage(filters.view)}
-                    onSetEditing={onSetEditing}
-                    onPatchRecord={onPatchRecord}
-                    onDeleteRecord={onDeleteRecord}
-                    onToggleRow={toggleRow}
-                    onToggleAllVisible={toggleAllVisible}
-                  />
+                  {filters.view === "cleared" ? (
+                    <BoosterSettlementsTable 
+                      transactions={filteredSettlements}
+                      emptyMessage="No run cleared/settlement history match these filters."
+                    />
+                  ) : (
+                    <BoosterRecordsTable
+                      records={filteredRecords}
+                      prices={activePrices}
+                      user={user}
+                      isAdmin={isAdmin}
+                      permissions={permissions}
+                      editing={editing}
+                      selectedIds={selectedIds}
+                      visibleOpenRows={visibleOpenRows}
+                      emptyMessage={emptyMessage(filters.view)}
+                      onSetEditing={onSetEditing}
+                      onPatchRecord={onPatchRecord}
+                      onDeleteRecord={onDeleteRecord}
+                      onToggleRow={toggleRow}
+                      onToggleAllVisible={toggleAllVisible}
+                    />
+                  )}
                 </>
               )}
             </>
@@ -506,6 +527,7 @@ export function BoosterPayoutPage({
 function matchesFilters(record, filters) {
   if (filters.view === "open" && record.paid) return false;
   if (filters.view === "paid" && !record.paid) return false;
+  if (filters.view === "cleared" && !record.paid) return false;
   if (filters.booster !== "all" && record.boosterName !== filters.booster) return false;
   if (filters.level !== "all" && record.level !== filters.level) return false;
   const recordDate = String(record.createdAt || "").slice(0, 10);
@@ -536,7 +558,7 @@ function uniqueSorted(values) {
 }
 
 function emptyMessage(view) {
-  if (view === "paid") return "No paid booster payouts match these filters.";
+  if (view === "paid" || view === "cleared") return "No cleared/paid booster payouts match these filters.";
   if (view === "open")
     return "No open booster payouts match these filters. Record a completed run or clear the filters.";
   return "No booster payouts match these filters.";

@@ -34,6 +34,13 @@ export function BoosterBalanceTab({
   const [settleBoosterData, setSettleBoosterData] = useState(null);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawBoosterData, setWithdrawBoosterData] = useState(null);
+  const [vaultPage, setVaultPage] = useState(1);
+  const [adjPage, setAdjPage] = useState(1);
+  
+  React.useEffect(() => {
+    setVaultPage(1);
+    setAdjPage(1);
+  }, [searchQuery]);
 
   // Compute aggregated balances per booster
   const rawBoosterBalances = useMemo(
@@ -161,6 +168,13 @@ export function BoosterBalanceTab({
       onDeleteAdjustment(adj.id);
     }
   };
+
+  const pageSize = 10;
+  const vaultTotalPages = Math.ceil(filteredVaultTransactions.length / pageSize) || 1;
+  const currentVaultTx = filteredVaultTransactions.slice((vaultPage - 1) * pageSize, vaultPage * pageSize);
+
+  const adjTotalPages = Math.ceil(filteredAdjustments.length / pageSize) || 1;
+  const currentAdjustments = filteredAdjustments.slice((adjPage - 1) * pageSize, adjPage * pageSize);
 
   return (
     <section className="space-y-6 pt-4">
@@ -391,14 +405,14 @@ export function BoosterBalanceTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 font-medium text-xs sm:text-sm">
-              {filteredVaultTransactions.length === 0 ? (
+              {currentVaultTx.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
                     No stored cash vault transactions recorded yet.
                   </td>
                 </tr>
               ) : (
-                filteredVaultTransactions.map((tx) => (
+                currentVaultTx.map((tx) => (
                   <tr key={tx.id} className="transition-colors hover:bg-muted/20">
                     <td className="px-4 py-3 font-mono text-muted-foreground whitespace-nowrap">
                       <TableDateCell date={tx.date} createdAt={tx.createdAt} className="items-start" />
@@ -411,6 +425,11 @@ export function BoosterBalanceTab({
                         <Badge variant="outline" className="gap-1 text-[11px] font-bold border-amber-500/40 text-amber-300 bg-amber-500/10">
                           <Lock className="size-3" aria-hidden="true" />
                           + Vault Deposit
+                        </Badge>
+                      ) : tx.type === "direct_payout" ? (
+                        <Badge variant="success" className="gap-1 text-[11px] font-bold">
+                          <Banknote className="size-3" aria-hidden="true" />
+                          Direct Payout
                         </Badge>
                       ) : (
                         <Badge variant="success" className="gap-1 text-[11px] font-bold">
@@ -425,7 +444,7 @@ export function BoosterBalanceTab({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">
-                      {tx.type === "deposit" && tx.goldAmount > 0 ? (
+                      {(tx.type === "deposit" || tx.type === "direct_payout") && tx.goldAmount > 0 ? (
                         <span>{money(tx.goldAmount)} Gold @ {tx.rate} MMK</span>
                       ) : (
                         <span>-</span>
@@ -444,6 +463,34 @@ export function BoosterBalanceTab({
             </tbody>
           </table>
         </div>
+        {vaultTotalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border/80 bg-muted/10 text-xs">
+            <span className="text-muted-foreground">
+              Showing {(vaultPage - 1) * pageSize + 1} to {Math.min(vaultPage * pageSize, filteredVaultTransactions.length)} of {filteredVaultTransactions.length} records
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => setVaultPage((p) => Math.max(1, p - 1))}
+                disabled={vaultPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="px-2 font-medium">Page {vaultPage} of {vaultTotalPages}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => setVaultPage((p) => Math.min(vaultTotalPages, p + 1))}
+                disabled={vaultPage === vaultTotalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Adjustments Audit Log / Ledger Table */}
@@ -472,14 +519,14 @@ export function BoosterBalanceTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 font-medium text-xs sm:text-sm">
-              {filteredAdjustments.length === 0 ? (
+              {currentAdjustments.length === 0 ? (
                 <tr>
                   <td colSpan={isAdmin ? 7 : 6} className="py-10 text-center text-xs text-muted-foreground">
                     No balance adjustments recorded yet.
                   </td>
                 </tr>
               ) : (
-                filteredAdjustments.map((adj) => (
+                currentAdjustments.map((adj) => (
                   <tr key={adj.id} className="transition-colors hover:bg-muted/20">
                     <td className="px-4 py-3 font-mono text-muted-foreground whitespace-nowrap">
                       <TableDateCell date={adj.date} createdAt={adj.createdAt} className="items-start" />
@@ -547,6 +594,34 @@ export function BoosterBalanceTab({
             </tbody>
           </table>
         </div>
+        {adjTotalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border/80 bg-muted/10 text-xs">
+            <span className="text-muted-foreground">
+              Showing {(adjPage - 1) * pageSize + 1} to {Math.min(adjPage * pageSize, filteredAdjustments.length)} of {filteredAdjustments.length} records
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => setAdjPage((p) => Math.max(1, p - 1))}
+                disabled={adjPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="px-2 font-medium">Page {adjPage} of {adjTotalPages}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => setAdjPage((p) => Math.min(adjTotalPages, p + 1))}
+                disabled={adjPage === adjTotalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Create / Edit Gold Adjustment Dialog */}
