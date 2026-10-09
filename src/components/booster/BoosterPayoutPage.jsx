@@ -68,7 +68,7 @@ export function BoosterPayoutPage({
   
   const filteredSettlements = useMemo(() => {
     return vaultTransactions.filter((tx) => {
-      if (tx.type !== "direct_payout" && !(tx.type === "deposit" && tx.settlementBatchId)) return false;
+      if (tx.type !== "direct_payout") return false;
       if (filters.booster !== "all" && tx.boosterName !== filters.booster) return false;
       const txDate = String(tx.createdAt || tx.date || "").slice(0, 10);
       if (filters.dateFrom && txDate < filters.dateFrom) return false;
@@ -275,7 +275,7 @@ export function BoosterPayoutPage({
                   ? [
                       ["all", "All records"],
                       ["balances", "Booster balances & Vault"],
-                      ["cleared", "Run Cleared History"]
+                      ["cleared", "Paid Balance History"]
                     ]
                   : [["vault", "My Stored Cash (MMK)"]])
               ].map(([value, label]) => (

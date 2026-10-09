@@ -49,17 +49,10 @@ export function BoosterSettlementsTable({ transactions = [], emptyMessage = "No 
                     {tx.boosterName}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {tx.type === "deposit" ? (
-                      <Badge variant="outline" className="gap-1 text-[11px] font-bold border-amber-500/40 text-amber-300 bg-amber-500/10">
-                        <Lock className="size-3" aria-hidden="true" />
-                        Hold in Vault
-                      </Badge>
-                    ) : (
-                      <Badge variant="success" className="gap-1 text-[11px] font-bold">
-                        <Banknote className="size-3" aria-hidden="true" />
-                        Direct Payout
-                      </Badge>
-                    )}
+                    <Badge variant="success" className="gap-1 text-[11px] font-bold">
+                      <Banknote className="size-3" aria-hidden="true" />
+                      Paid Balance
+                    </Badge>
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap text-amber-300">
                     {money(tx.goldAmount)}
