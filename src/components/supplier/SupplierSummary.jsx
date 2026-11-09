@@ -28,7 +28,7 @@ export function SupplierSummary({
         </div>
         <div className="section-actions">
           <div className="flex flex-col items-end gap-0.5">
-            <strong className={`font-mono text-xl font-bold tabular-nums ${isDeficit ? "text-rose-400" : "text-emerald-300"}`}>
+            <strong className={`font-mono text-xl font-bold tabular-nums ${isDeficit ? "text-danger-text" : "text-success-text"}`}>
               {money(calculatedNet)}
             </strong>
             {activeWithdrawalsTotal > 0 && (
@@ -67,13 +67,13 @@ export function SupplierSummary({
                 <TableCell colSpan="3">Verified sales total</TableCell>
                 <TableCell>{money(grandTotal)}</TableCell>
               </TableRow>
-              <TableRow className="text-amber-300">
+              <TableRow className="text-warning-text">
                 <TableCell colSpan="3">Active pre-withdrawals offset</TableCell>
                 <TableCell>-{money(activeWithdrawalsTotal)}</TableCell>
               </TableRow>
               <TableRow className="font-bold">
                 <TableCell colSpan="3">Net payable balance</TableCell>
-                <TableCell className={isDeficit ? "text-rose-400" : "text-emerald-300"}>
+                <TableCell className={isDeficit ? "text-danger-text" : "text-success-text"}>
                   {money(calculatedNet)}
                 </TableCell>
               </TableRow>

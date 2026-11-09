@@ -137,7 +137,7 @@ export function SupplierWithdrawalsTable({
             onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}
           />
         ) : (
-          <strong className="font-mono tabular-nums text-amber-300">
+          <strong className="font-mono tabular-nums text-warning-text">
             {money(getValue())}
           </strong>
         );

@@ -1,3 +1,5 @@
+import { markRatesSaved } from "../utils/rateDrafts.js";
+
 export function validateArmorRows(rows) {
   const names = rows.map((row) => String(row.name || "").trim()).filter(Boolean);
   if (names.length !== rows.length) throw new Error("Every armor stack option needs a name.");
@@ -45,8 +47,7 @@ export function useRateActions({
       body: JSON.stringify({ rows: supplierServices })
     });
     setData((current) => ({
-      ...current,
-      supplierServices: payload.supplierServices || [],
+      ...markRatesSaved(current, { supplierServices: payload.supplierServices || [] }),
       supplierSummary: payload.summary || []
     }));
     showToast("Supplier rates saved.");
@@ -59,10 +60,7 @@ export function useRateActions({
       method: "PUT",
       body: JSON.stringify({ rows: boosterPrices })
     });
-    setData((current) => ({
-      ...current,
-      boosterPrices: payload.boosterPrices || []
-    }));
+    setData((current) => markRatesSaved(current, { boosterPrices: payload.boosterPrices || [] }));
     showToast("Booster rates saved.");
   });
 
@@ -73,10 +71,7 @@ export function useRateActions({
       method: "PUT",
       body: JSON.stringify({ rows: supplierGuilds })
     });
-    setData((current) => ({
-      ...current,
-      supplierGuilds: payload.supplierGuilds || []
-    }));
+    setData((current) => markRatesSaved(current, { supplierGuilds: payload.supplierGuilds || [] }));
     showToast("Supplier guilds saved.");
   });
 
@@ -87,10 +82,7 @@ export function useRateActions({
       method: "PUT",
       body: JSON.stringify({ rows: raidNoteTitles })
     });
-    setData((current) => ({
-      ...current,
-      raidNoteTitles: payload.raidNoteTitles || []
-    }));
+    setData((current) => markRatesSaved(current, { raidNoteTitles: payload.raidNoteTitles || [] }));
     showToast("Raid note titles saved.");
   });
 
@@ -101,10 +93,7 @@ export function useRateActions({
       method: "PUT",
       body: JSON.stringify({ rows: buyerPurchaseTypes })
     });
-    setData((current) => ({
-      ...current,
-      buyerPurchaseTypes: payload.buyerPurchaseTypes || []
-    }));
+    setData((current) => markRatesSaved(current, { buyerPurchaseTypes: payload.buyerPurchaseTypes || [] }));
     showToast("Buyer purchase types saved.");
   });
 
@@ -115,10 +104,7 @@ export function useRateActions({
       method: "PUT",
       body: JSON.stringify({ rows: armorTypes })
     });
-    setData((current) => ({
-      ...current,
-      armorTypes: payload.armorTypes || []
-    }));
+    setData((current) => markRatesSaved(current, { armorTypes: payload.armorTypes || [] }));
     showToast("Armor stack options saved.");
   });
 

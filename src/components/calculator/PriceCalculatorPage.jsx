@@ -166,7 +166,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
             variant="ghost"
             size="sm"
             type="button"
-            className="text-xs text-muted-foreground hover:text-rose-300 hover:bg-rose-500/10"
+            className="text-xs text-muted-foreground hover:text-danger-text hover:bg-destructive/10"
             onClick={handleClearAll}
           >
             Clear all
@@ -197,17 +197,16 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
 
           {/* Table Container */}
           <div className="rate-table-wrapper w-full overflow-x-auto">
-            <div className="min-w-[620px]">
+            <div className="sm:min-w-[620px]">
               {/* Header */}
               <div
-                className="rate-table-header grid items-center gap-2 border-b border-border/80 bg-muted/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"
-                style={{ gridTemplateColumns: "minmax(140px, 1fr) 110px 80px 80px 115px 44px" }}
+                className="rate-table-header calc-cols hidden items-center sm:grid gap-2 border-b border-border/80 bg-muted/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"
               >
                 <span>Service Name</span>
                 <span className="text-right">Original</span>
                 <span className="text-right">Tier 1</span>
                 <span className="text-right">Tier 2</span>
-                <span className="text-right text-amber-400">Final Price</span>
+                <span className="text-right text-warning-text">Final Price</span>
                 <span className="text-center">Action</span>
               </div>
 
@@ -225,8 +224,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                   calculatedItems.map((item) => (
                     <div
                       key={item.id}
-                      className="rate-table-row grid items-center gap-2 px-3 py-2 transition-colors hover:bg-muted/20"
-                      style={{ gridTemplateColumns: "minmax(140px, 1fr) 110px 80px 80px 115px 44px" }}
+                      className="rate-table-row calc-cols grid items-center gap-2 px-3 py-2 transition-colors hover:bg-muted/20"
                     >
                       {/* Service Name */}
                       <div className="min-w-0">
@@ -240,7 +238,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                       </div>
 
                       {/* Original Price */}
-                      <div>
+                      <div data-label="Original">
                         <Input
                           type="number"
                           min="0"
@@ -254,7 +252,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                       </div>
 
                       {/* Tier 1 Discount */}
-                      <div>
+                      <div data-label="Tier 1">
                         <div className="relative">
                           <Input
                             type="number"
@@ -272,7 +270,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                       </div>
 
                       {/* Tier 2 Discount */}
-                      <div>
+                      <div data-label="Tier 2">
                         <div className="relative">
                           <Input
                             type="number"
@@ -290,11 +288,11 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                       </div>
 
                       {/* Final Price */}
-                      <div className="flex flex-col text-right font-mono pr-1">
-                        <span className="text-xs text-sky-300 font-semibold line-through opacity-70">
+                      <div data-label="Final price" className="flex flex-col text-right font-mono pr-1">
+                        <span className="text-xs text-info-text font-semibold line-through opacity-70">
                           {money(item.discountedPrice1)}
                         </span>
-                        <span className="text-xs sm:text-sm font-bold text-amber-300">
+                        <span className="text-xs sm:text-sm font-bold text-warning-text">
                           {money(item.discountedPrice2)}
                         </span>
                       </div>
@@ -305,7 +303,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
                           variant="ghost"
                           size="icon"
                           type="button"
-                          className="size-7 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10"
+                          className="size-7 text-muted-foreground hover:text-danger-text hover:bg-destructive/10"
                           onClick={() => handleDeleteRow(item.id)}
                           title="Delete service row"
                           aria-label="Delete service row"
@@ -326,7 +324,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
               <span className="text-muted-foreground">{calculatedItems.length} service row{calculatedItems.length === 1 ? "" : "s"}</span>
               <div className="flex items-center gap-4 font-mono">
                 <span>Orig Total: <strong className="text-foreground">{money(totals.original)}</strong></span>
-                <span>Final Total: <strong className="text-amber-300">{money(totals.tier2)}</strong></span>
+                <span>Final Total: <strong className="text-warning-text">{money(totals.tier2)}</strong></span>
               </div>
             </div>
           )}
@@ -345,7 +343,7 @@ export function PriceCalculatorPage({ isAdmin = true, supplierServices = [] }) {
               type="button"
               className={cn(
                 "font-bold shadow-md transition-all",
-                copied ? "bg-emerald-600 hover:bg-emerald-600 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"
+                copied ? "bg-success/90 hover:bg-success/90 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"
               )}
               onClick={handleCopyToClipboard}
               disabled={!copyableText}

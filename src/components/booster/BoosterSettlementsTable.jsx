@@ -54,13 +54,13 @@ export function BoosterSettlementsTable({ transactions = [], emptyMessage = "No 
                       Paid Balance
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap text-amber-300">
+                  <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap text-warning-text">
                     {money(tx.goldAmount)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-muted-foreground whitespace-nowrap">
                     {tx.rate} MMK
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap text-sky-400">
+                  <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap text-info-text">
                     {mmk(tx.amount)}
                   </td>
                   <td className="px-4 py-3 text-foreground/90 max-w-xs truncate" title={tx.note}>

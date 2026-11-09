@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge.jsx";
 import { cn } from "@/lib/utils.js";
 
 const COLOR_OPTIONS = [
-  { id: "default", label: "Default", bg: "bg-slate-800/60 border-slate-700" },
-  { id: "blue", label: "Sky / Heroic", bg: "bg-sky-950/40 border-sky-500/40 text-sky-300" },
-  { id: "purple", label: "Purple / Mythic", bg: "bg-purple-950/40 border-purple-500/40 text-purple-300" },
-  { id: "emerald", label: "Emerald / Normal", bg: "bg-emerald-950/40 border-emerald-500/40 text-emerald-300" },
-  { id: "amber", label: "Amber / Gold", bg: "bg-amber-950/40 border-amber-500/40 text-amber-300" },
-  { id: "rose", label: "Rose", bg: "bg-rose-950/40 border-rose-500/40 text-rose-300" }
+  { id: "default", label: "Default", bg: "bg-secondary/60 border-input" },
+  { id: "blue", label: "Sky / Heroic", bg: "bg-primary/15 border-primary/40 text-info-text" },
+  { id: "purple", label: "Purple / Mythic", bg: "bg-special/15 border-special/40 text-special-text" },
+  { id: "emerald", label: "Emerald / Normal", bg: "bg-success/15 border-success/40 text-success-text" },
+  { id: "amber", label: "Amber / Gold", bg: "bg-warning/15 border-warning/40 text-warning-text" },
+  { id: "rose", label: "Rose", bg: "bg-destructive/15 border-destructive/40 text-danger-text" }
 ];
 
 export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], buyerPurchaseTypes = [] }) {
@@ -169,7 +169,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], buyerPu
           className="shrink-0 size-8 text-muted-foreground hover:text-primary"
           title={pinned ? "Unpin note" : "Pin note to top"}
         >
-          {pinned ? <Pin className="size-4 text-amber-400 fill-amber-400" /> : <PinOff className="size-4" />}
+          {pinned ? <Pin className="size-4 text-warning-text fill-warning-text" /> : <PinOff className="size-4" />}
         </Button>
       </div>
 

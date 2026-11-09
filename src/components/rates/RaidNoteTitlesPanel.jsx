@@ -90,7 +90,7 @@ export function RaidNoteTitlesPanel({
           </div>
 
           {duplicateNames.size > 0 && (
-            <span className="text-xs font-semibold text-rose-400" role="alert">
+            <span className="text-xs font-semibold text-danger-text" role="alert">
               Duplicate titles found
             </span>
           )}
@@ -134,8 +134,8 @@ export function RaidNoteTitlesPanel({
                       className={cn(
                         "rate-table-row grid items-center gap-2 px-3 py-1.5 transition-colors hover:bg-muted/20",
                         isArchived && "opacity-75 bg-muted/10",
-                        duplicate && "bg-rose-950/20 border-l-2 border-rose-500",
-                        isDefault && "bg-amber-500/[0.06] border-l-2 border-amber-400"
+                        duplicate && "bg-destructive/15 border-l-2 border-destructive",
+                        isDefault && "bg-warning/[0.06] border-l-2 border-warning"
                       )}
                       style={{ gridTemplateColumns: "36px minmax(160px, 1fr) 95px 130px" }}
                     >
@@ -145,7 +145,7 @@ export function RaidNoteTitlesPanel({
                           variant="ghost"
                           size="icon"
                           type="button"
-                          className="size-7 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-400/10"
+                          className="size-7 rounded-md text-muted-foreground hover:text-warning-text hover:bg-warning/10"
                           onClick={() => onSetDefault?.(index)}
                           disabled={disabled || isArchived}
                           title={isDefault ? "Default selection for new notes" : "Set as default title"}
@@ -154,7 +154,7 @@ export function RaidNoteTitlesPanel({
                           <Star
                             className={cn(
                               "size-4 transition-transform active:scale-125",
-                              isDefault ? "fill-amber-400 text-amber-400" : "text-slate-500 hover:text-amber-400"
+                              isDefault ? "fill-warning-text text-warning-text" : "text-muted-foreground hover:text-warning-text"
                             )}
                             aria-hidden="true"
                           />
@@ -172,7 +172,7 @@ export function RaidNoteTitlesPanel({
                           aria-invalid={duplicate}
                           className={cn(
                             "h-8 min-h-0 text-xs sm:text-sm px-2.5 bg-popover/80 rounded-lg",
-                            duplicate && "border-rose-500 focus-visible:ring-rose-500"
+                            duplicate && "border-destructive focus-visible:ring-destructive"
                           )}
                         />
                       </div>
@@ -203,8 +203,8 @@ export function RaidNoteTitlesPanel({
                           className={cn(
                             "h-7 px-2 text-xs rounded-md font-medium border-border/80",
                             isArchived
-                              ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
-                              : "text-slate-300 hover:text-white hover:bg-secondary"
+                              ? "text-success-text border-success/40 bg-success/10 hover:bg-success/20"
+                              : "text-secondary-foreground hover:text-white hover:bg-secondary"
                           )}
                           onClick={() => onToggle?.(index)}
                           disabled={disabled}
@@ -217,7 +217,7 @@ export function RaidNoteTitlesPanel({
                             variant="outline"
                             size="sm"
                             type="button"
-                            className="h-7 px-2 text-xs rounded-md font-medium border-rose-500/40 text-rose-300 bg-rose-500/5 hover:bg-rose-500/20 hover:text-rose-200"
+                            className="h-7 px-2 text-xs rounded-md font-medium border-destructive/40 text-danger-text bg-destructive/5 hover:bg-destructive/20 hover:text-danger-text"
                             onClick={() => onDelete?.(index)}
                             disabled={disabled}
                             title={`Delete ${row.name || "title"}`}

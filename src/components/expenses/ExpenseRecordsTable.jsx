@@ -109,9 +109,9 @@ export function ExpenseRecordsTable({
               variant="outline"
               className={cn(
                 "font-semibold text-[11px] px-2 py-0.5",
-                isRaid && "bg-purple-500/15 text-purple-300 border-purple-500/40",
-                isOutsource && "bg-sky-500/15 text-sky-300 border-sky-500/40",
-                !isRaid && !isOutsource && "bg-slate-500/15 text-slate-300 border-slate-500/40"
+                isRaid && "bg-special/15 text-special-text border-special/40",
+                isOutsource && "bg-primary/15 text-info-text border-primary/40",
+                !isRaid && !isOutsource && "bg-muted-foreground/15 text-secondary-foreground border-input/40"
               )}
             >
               {val}
@@ -153,7 +153,7 @@ export function ExpenseRecordsTable({
             onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}
           />
         ) : (
-          <strong className="font-mono tabular-nums text-rose-300">
+          <strong className="font-mono tabular-nums text-danger-text">
             {money(getValue())}
           </strong>
         );

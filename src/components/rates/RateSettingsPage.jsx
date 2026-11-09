@@ -18,6 +18,8 @@ export function RateSettingsPage({
   loading,
   loadError,
   canEditPrices,
+  unsavedSections = [],
+  onDiscardChanges,
   supplierServices,
   boosterPrices,
   supplierGuilds = [],
@@ -100,6 +102,22 @@ export function RateSettingsPage({
           </p>
         </div>
       </header>
+
+      {unsavedSections.length > 0 && (
+        <Alert variant="warning" className="sticky top-2 z-20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-live="polite">
+          <div>
+            <AlertTitle>Unsaved changes</AlertTitle>
+            <AlertDescription>
+              {unsavedSections.map((section) => section.label).join(", ")} {unsavedSections.length === 1 ? "has" : "have"} edits that are not saved yet. Use each section's save button, or discard them.
+            </AlertDescription>
+          </div>
+          {onDiscardChanges && (
+            <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={onDiscardChanges}>
+              Discard changes
+            </Button>
+          )}
+        </Alert>
+      )}
 
       {/* Top row: 2 rates tables side-by-side on desktop */}
       <section className="price-grid grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Default rate tables">
@@ -279,7 +297,7 @@ function PricePanel({
           </div>
 
           {duplicateNames.size > 0 && (
-            <span className="text-xs font-semibold text-rose-400" role="alert">
+            <span className="text-xs font-semibold text-danger-text" role="alert">
               Duplicate {itemLabel} names found
             </span>
           )}
@@ -324,8 +342,8 @@ function PricePanel({
                       className={cn(
                         "rate-table-row grid items-center gap-2 px-3 py-1.5 transition-colors hover:bg-muted/20",
                         isArchived && "opacity-75 bg-muted/10",
-                        duplicate && "bg-rose-950/20 border-l-2 border-rose-500",
-                        isDefault && "bg-amber-500/[0.06] border-l-2 border-amber-400"
+                        duplicate && "bg-destructive/15 border-l-2 border-destructive",
+                        isDefault && "bg-warning/[0.06] border-l-2 border-warning"
                       )}
                       style={{ gridTemplateColumns: "36px minmax(130px, 1fr) 110px 85px 130px" }}
                     >
@@ -335,7 +353,7 @@ function PricePanel({
                           variant="ghost"
                           size="icon"
                           type="button"
-                          className="size-7 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-400/10"
+                          className="size-7 rounded-md text-muted-foreground hover:text-warning-text hover:bg-warning/10"
                           onClick={() => onSetDefault?.(index)}
                           disabled={disabled || isArchived}
                           title={isDefault ? "Default selection for new records" : "Set as default selection for new records"}
@@ -344,7 +362,7 @@ function PricePanel({
                           <Star
                             className={cn(
                               "size-4 transition-transform active:scale-125",
-                              isDefault ? "fill-amber-400 text-amber-400" : "text-slate-500 hover:text-amber-400"
+                              isDefault ? "fill-warning-text text-warning-text" : "text-muted-foreground hover:text-warning-text"
                             )}
                             aria-hidden="true"
                           />
@@ -362,7 +380,7 @@ function PricePanel({
                           aria-invalid={duplicate}
                           className={cn(
                             "h-8 min-h-0 text-xs sm:text-sm px-2.5 bg-popover/80 rounded-lg",
-                            duplicate && "border-rose-500 focus-visible:ring-rose-500"
+                            duplicate && "border-destructive focus-visible:ring-destructive"
                           )}
                         />
                       </div>
@@ -407,8 +425,8 @@ function PricePanel({
                           className={cn(
                             "h-7 px-2 text-xs rounded-md font-medium border-border/80",
                             isArchived
-                              ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
-                              : "text-slate-300 hover:text-white hover:bg-secondary"
+                              ? "text-success-text border-success/40 bg-success/10 hover:bg-success/20"
+                              : "text-secondary-foreground hover:text-white hover:bg-secondary"
                           )}
                           onClick={() => onToggle(index)}
                           disabled={disabled}
@@ -421,7 +439,7 @@ function PricePanel({
                             variant="outline"
                             size="sm"
                             type="button"
-                            className="h-7 px-2 text-xs rounded-md font-medium border-rose-500/40 text-rose-300 bg-rose-500/5 hover:bg-rose-500/20 hover:text-rose-200"
+                            className="h-7 px-2 text-xs rounded-md font-medium border-destructive/40 text-danger-text bg-destructive/5 hover:bg-destructive/20 hover:text-danger-text"
                             onClick={() => onDelete?.(index)}
                             disabled={disabled}
                             title={`Delete ${row[itemKey] || itemLabel}`}

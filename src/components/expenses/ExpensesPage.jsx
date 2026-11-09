@@ -111,23 +111,23 @@ export function ExpensesPage({
           <section className="batch-bar" aria-label="Expenses summary">
             <div className="border-t-2 border-t-rose-500/80">
               <span className="batch-label">Total Expenses</span>
-              <strong className="text-rose-300">{money(summary.total)}</strong>
+              <strong className="text-danger-text">{money(summary.total)}</strong>
               <small>{summary.count} recorded row{summary.count === 1 ? "" : "s"}</small>
             </div>
             <div className="border-t-2 border-t-purple-500/80">
               <span className="batch-label">Raid Payments</span>
-              <strong className="text-purple-300">{money(summary.raidTotal)}</strong>
+              <strong className="text-special-text">{money(summary.raidTotal)}</strong>
               <small>{summary.raidCount || 0} raid pot{summary.raidCount === 1 ? "" : "s"}</small>
             </div>
             <div className="border-t-2 border-t-sky-400/80">
               <span className="batch-label">M+ Outsource Payments</span>
-              <strong className="text-sky-300">{money(summary.outsourceTotal)}</strong>
+              <strong className="text-info-text">{money(summary.outsourceTotal)}</strong>
               <small>{summary.outsourceCount || 0} outsource key{summary.outsourceCount === 1 ? "" : "s"}</small>
             </div>
             {summary.otherTotal > 0 && (
               <div className="border-t-2 border-t-slate-500/80">
                 <span className="batch-label">Other Expenses</span>
-                <strong className="text-slate-300">{money(summary.otherTotal)}</strong>
+                <strong className="text-secondary-foreground">{money(summary.otherTotal)}</strong>
                 <small>{summary.otherCount || 0} row{summary.otherCount === 1 ? "" : "s"}</small>
               </div>
             )}

@@ -56,12 +56,6 @@ import {
   getRaidNoteById,
   updateRaidNote,
   deleteRaidNote,
-  getRaidSchedulesPayload,
-  insertRaidSchedule,
-  insertRaidSchedules,
-  getRaidScheduleById,
-  updateRaidSchedule,
-  deleteRaidSchedule,
   getProfitReportData,
   getSessionFromDb,
   saveSessionToDb,
@@ -69,7 +63,6 @@ import {
   pruneExpiredSessions,
   lineTotal
 } from "./lib/db.js";
-import { extractScheduleFromImage } from "./lib/scheduleImageScanner.js";
 
 const root = resolve(".");
 const publicDir = join(root, "public");
@@ -127,7 +120,6 @@ const rateLimitBuckets = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_AUTH = 30;
 const RATE_LIMIT_MAX_MUTATIONS = 120;
-const RATE_LIMIT_MAX_SCANS = 10;
 
 function getClientIp(req) {
   if (process.env.TRUST_PROXY === "true") {
@@ -305,9 +297,7 @@ function permissionsFor(session) {
     profitReport: canManageAdmin(session),
     priceSettings: canManageAdmin(session),
     externalExpenses: canManageAdmin(session),
-    raidNotes: canManageAdmin(session),
-    raidSchedule: canManageAdmin(session) || canUseBooster(session),
-    raidScheduleEdit: canManageAdmin(session)
+    raidNotes: canManageAdmin(session)
   };
 }
 
@@ -1251,146 +1241,6 @@ async function handleApi(req, res, url) {
     await deleteRaidNote(id);
     incrementLedgerVersion();
     const payload = await getRaidNotesPayload();
-    return sendJson(res, 200, { deletedId: id, ...payload });
-  }
-
-  if (pathname === "/api/raid-schedules" && req.method === "GET") {
-    if (!canManageAdmin(session) && !canUseBooster(session)) return notAllowed(res, "Sign in to view raid schedules.");
-    const payload = await getRaidSchedulesPayload();
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/raid-schedules" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can schedule raid runs.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const raid = String(body.raid || "").trim();
-    if (!raid) return sendJson(res, 400, { error: "Raid name is required." });
-    const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
-    if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid date." });
-    const timeEst = String(body.timeEst || "").trim();
-    const difficulty = String(body.difficulty || "Heroic").trim();
-    const loot = String(body.loot || "Unsaved").trim();
-    const maxBuyers = Math.max(1, Math.min(30, parseInt(body.maxBuyers, 10) || 6));
-    const buyers = Array.isArray(body.buyers) ? body.buyers : [];
-    const lead = String(body.lead || "").trim();
-    const note = String(body.note || "").trim();
-    const isFull = Boolean(body.isFull);
-
-    const record = await insertRaidSchedule({
-      date,
-      timeEst,
-      raid,
-      difficulty,
-      loot,
-      maxBuyers,
-      buyers,
-      lead,
-      note,
-      isFull
-    }, session);
-    incrementLedgerVersion();
-    const payload = await getRaidSchedulesPayload();
-    return sendJson(res, 201, { schedule: record, ...payload });
-  }
-
-  if (pathname === "/api/raid-schedules/scan-image" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can scan raid schedule images.");
-    if (!requireCsrf(req, res, session)) return;
-
-    const ip = getClientIp(req);
-    const rateLimitKey = session?.discordId || ip;
-    if (!checkRateLimit(rateLimitKey, "scan", RATE_LIMIT_MAX_SCANS)) {
-      return sendJson(res, 429, { error: "Too many scan requests. Please wait a minute before trying again." });
-    }
-
-    const rawBody = await readJson(req, 10_000_000);
-    const body = (rawBody && typeof rawBody === "object") ? rawBody : {};
-    const image = body.image;
-    if (!image || typeof image !== "string" || !image.trim()) {
-      return sendJson(res, 400, { error: "Image data is required." });
-    }
-
-    const mimeType = String(body.mimeType || "image/jpeg").trim();
-    const weekAnchorDate = body.weekAnchorDate ? String(body.weekAnchorDate).trim() : null;
-
-    try {
-      const result = await extractScheduleFromImage({ image, mimeType, weekAnchorDate });
-      return sendJson(res, 200, result);
-    } catch (err) {
-      const status = err.statusCode || 500;
-      return sendJson(res, status, { error: err.message || "Failed to scan image." });
-    }
-  }
-
-  if (pathname === "/api/raid-schedules/batch" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can batch insert raid schedules.");
-    if (!requireCsrf(req, res, session)) return;
-
-    const rawBody = await readJson(req);
-    const body = (rawBody && typeof rawBody === "object") ? rawBody : {};
-    const runs = Array.isArray(body.runs) ? body.runs : [];
-    if (runs.length === 0) {
-      return sendJson(res, 400, { error: "At least one raid run is required." });
-    }
-    if (runs.length > 100) {
-      return sendJson(res, 400, { error: "Batch import limit exceeded (maximum 100 runs per batch)." });
-    }
-
-    const result = await insertRaidSchedules(runs, session);
-    incrementLedgerVersion();
-    const payload = await getRaidSchedulesPayload();
-    return sendJson(res, 201, {
-      insertedCount: result.count,
-      inserted: result.inserted,
-      ...payload
-    });
-  }
-
-  if (pathname.startsWith("/api/raid-schedules/") && req.method === "PATCH") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update raid schedules.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getRaidScheduleById(id);
-    if (!existing) return sendJson(res, 404, { error: "Raid schedule not found." });
-
-    const body = await readJson(req);
-    const updates = {};
-    if ("raid" in body) {
-      const raid = String(body.raid || "").trim();
-      if (!raid) return sendJson(res, 400, { error: "Raid name cannot be empty." });
-      updates.raid = raid;
-    }
-    if ("date" in body) {
-      const date = String(body.date || "").trim();
-      if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid date." });
-      updates.date = date;
-    }
-    if ("timeEst" in body) updates.timeEst = String(body.timeEst || "").trim();
-    if ("difficulty" in body) updates.difficulty = String(body.difficulty || "").trim();
-    if ("loot" in body) updates.loot = String(body.loot || "").trim();
-    if ("maxBuyers" in body) updates.maxBuyers = Math.max(1, Math.min(30, parseInt(body.maxBuyers, 10) || 6));
-    if ("buyers" in body && Array.isArray(body.buyers)) updates.buyers = body.buyers;
-    if ("lead" in body) updates.lead = String(body.lead || "").trim();
-    if ("note" in body) updates.note = String(body.note || "").trim();
-    if ("isFull" in body) updates.isFull = Boolean(body.isFull);
-
-    const updated = await updateRaidSchedule(id, updates);
-    incrementLedgerVersion();
-    const payload = await getRaidSchedulesPayload();
-    return sendJson(res, 200, { schedule: updated, ...payload });
-  }
-
-  if (pathname.startsWith("/api/raid-schedules/") && req.method === "DELETE") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete raid schedules.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getRaidScheduleById(id);
-    if (!existing) return sendJson(res, 404, { error: "Raid schedule not found." });
-
-    await deleteRaidSchedule(id);
-    incrementLedgerVersion();
-    const payload = await getRaidSchedulesPayload();
     return sendJson(res, 200, { deletedId: id, ...payload });
   }
 

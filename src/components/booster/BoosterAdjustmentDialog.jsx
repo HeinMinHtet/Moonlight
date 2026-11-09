@@ -124,7 +124,7 @@ export function BoosterAdjustmentDialog({
           </div>
 
           {error && (
-            <div className="rounded-lg bg-rose-500/15 border border-rose-500/30 p-2.5 text-xs font-semibold text-rose-300" role="alert">
+            <div className="rounded-lg bg-destructive/15 border border-destructive/30 p-2.5 text-xs font-semibold text-danger-text" role="alert">
               {error}
             </div>
           )}
@@ -165,7 +165,7 @@ export function BoosterAdjustmentDialog({
                 className={cn(
                   "py-2 text-xs font-bold rounded-lg transition-all cursor-pointer",
                   type === "add"
-                    ? "bg-emerald-500 text-slate-950 shadow-sm"
+                    ? "bg-success text-background shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 )}
                 onClick={() => setType("add")}
@@ -177,7 +177,7 @@ export function BoosterAdjustmentDialog({
                 className={cn(
                   "py-2 text-xs font-bold rounded-lg transition-all cursor-pointer",
                   type === "deduct"
-                    ? "bg-rose-500 text-white shadow-sm"
+                    ? "bg-destructive text-white shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 )}
                 onClick={() => setType("deduct")}
@@ -244,7 +244,7 @@ export function BoosterAdjustmentDialog({
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground line-through">{money(existingBalance)}</span>
                 <span className="font-bold text-sm text-foreground">
-                  → <span className={newProjectedBalance < 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>{money(newProjectedBalance)}</span>
+                  → <span className={newProjectedBalance < 0 ? "text-danger-text font-bold" : "text-success-text font-bold"}>{money(newProjectedBalance)}</span>
                 </span>
               </div>
             </div>
@@ -260,7 +260,7 @@ export function BoosterAdjustmentDialog({
               className={cn(
                 "font-bold",
                 type === "deduct"
-                  ? "bg-rose-500 hover:bg-rose-600 text-white"
+                  ? "bg-destructive hover:bg-destructive/90 text-white"
                   : "bg-primary text-primary-foreground"
               )}
             >

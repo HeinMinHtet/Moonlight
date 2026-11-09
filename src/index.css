@@ -23,6 +23,12 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-success-text: var(--success-text);
+  --color-warning-text: var(--warning-text);
+  --color-danger-text: var(--danger-text);
+  --color-info-text: var(--info-text);
+  --color-special: var(--special);
+  --color-special-text: var(--special-text);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -30,9 +36,10 @@
   --radius-sm: calc(var(--radius-ui) - 4px);
   --radius-md: calc(var(--radius-ui) - 2px);
   --radius-lg: var(--radius-ui);
-  --font-sans: "Aptos", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Aptos Display", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  /* Inter + JetBrains Mono are loaded in index.html so every device renders the same type. */
+  --font-sans: "Inter", system-ui, "Segoe UI", sans-serif;
+  --font-display: "Inter", system-ui, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
 }
 
 :root {
@@ -61,6 +68,14 @@
   --border: #1e354e;
   --input: #2b4968;
   --ring: #38bdf8;
+  /* Status colours: one meaning, one colour. Use bg-/border- with success, warning,
+     destructive, primary or special; use the *-text tokens for text and icons. */
+  --success-text: #34d399;
+  --warning-text: #fbbf24;
+  --danger-text: #fda4af;
+  --info-text: #7dd3fc;
+  --special: #818cf8;
+  --special-text: #c7d2fe;
   --radius-ui: 0.75rem;
   --shadow-soft: 0 16px 40px -10px rgba(0, 0, 0, 0.4);
   --shadow-raised: 0 20px 48px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.12);
@@ -144,7 +159,7 @@
   }
 
   .data-table-header-button {
-    @apply -ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-300 hover:bg-slate-800/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply -ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-left text-xs font-bold uppercase tracking-wider text-secondary-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
   }
 
   .table-edit-field {
@@ -225,15 +240,15 @@
   }
 
   .ledger-navigation {
-    @apply my-5 min-w-0;
+    @apply my-5 flex min-w-0 flex-col gap-2;
   }
 
   .ledger-navigation-list {
-    @apply grid w-full min-w-0 grid-cols-2 gap-2 rounded-2xl border border-border/80 bg-card/85 p-2 text-slate-400 shadow-lg backdrop-blur-md sm:grid-cols-3 lg:grid-cols-5;
+    @apply grid w-full min-w-0 grid-cols-2 gap-2 rounded-2xl border border-border/80 bg-card/85 p-2 text-muted-foreground shadow-lg backdrop-blur-md sm:grid-cols-3 lg:grid-cols-5;
   }
 
   .ledger-navigation-item {
-    @apply min-w-0 whitespace-normal rounded-xl px-3 py-2.5 text-center font-medium leading-tight text-slate-300 transition-all duration-150 hover:bg-slate-800/70 hover:text-white data-[state=active]:bg-primary data-[state=active]:font-bold data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_4px_16px_rgba(56,189,248,0.3)];
+    @apply min-w-0 whitespace-normal rounded-xl px-3 py-2.5 text-center font-medium leading-tight text-secondary-foreground transition-all duration-150 hover:bg-secondary hover:text-foreground data-[state=active]:bg-primary data-[state=active]:font-bold data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_4px_16px_rgba(56,189,248,0.3)];
   }
 
   .ledger-navigation-item > span {
@@ -243,6 +258,50 @@
 
   .ledger-navigation-item:only-child {
     @apply col-span-2 sm:col-span-1;
+  }
+
+  /* Second row: views inside the selected group (e.g. Sales ledger / Paid history). */
+  .ledger-subnav-list {
+    @apply flex h-auto w-full min-w-0 flex-wrap justify-start gap-1.5 rounded-xl border border-border/60 bg-card/60 p-1.5 shadow-sm;
+  }
+
+  .ledger-subnav-item {
+    @apply min-h-10 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground data-[state=active]:bg-primary/15 data-[state=active]:font-semibold data-[state=active]:text-info-text data-[state=active]:shadow-[inset_0_0_0_1px_var(--primary)];
+  }
+
+  /* Entry forms wrap to the available width instead of fixed pixel columns. */
+  .entry-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  }
+
+  .expense-entry-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  }
+
+  /* Price calculator rows: table on wide screens, labelled 2-column cards on phones. */
+  .calc-cols {
+    grid-template-columns: minmax(140px, 1fr) 110px 80px 80px 115px 44px;
+  }
+
+  @media (max-width: 639px) {
+    .rate-table-row.calc-cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: 0.75rem;
+    }
+
+    .rate-table-row.calc-cols > :first-child {
+      grid-column: 1 / -1;
+    }
+
+    .calc-cols > [data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 0.25rem;
+      text-align: left;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted-foreground);
+    }
   }
 }
 

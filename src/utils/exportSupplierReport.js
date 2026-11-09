@@ -14,7 +14,7 @@ function svgText(value, x, y, options = {}) {
   const weight = options.weight || 400;
   const color = options.color || "#e2e8f0";
   const anchor = options.anchor ? ` text-anchor="${options.anchor}"` : "";
-  const isMono = options.mono ? ` font-family="'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace"` : ` font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"`;
+  const isMono = options.mono ? ` font-family="'JetBrains Mono', Consolas, 'Courier New', monospace"` : ` font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"`;
   return `<text x="${x}" y="${y}" fill="${color}" font-size="${size}" font-weight="${weight}"${isMono}${anchor}>${escapeSvg(value)}</text>`;
 }
 

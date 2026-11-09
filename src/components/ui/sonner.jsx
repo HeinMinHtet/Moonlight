@@ -8,8 +8,8 @@ export function Toaster(props) {
       richColors
       toastOptions={{
         classNames: {
-          toast: "border-border bg-slate-950 text-white shadow-xl",
-          description: "text-slate-300"
+          toast: "border-border bg-background text-white shadow-xl",
+          description: "text-secondary-foreground"
         }
       }}
       {...props}

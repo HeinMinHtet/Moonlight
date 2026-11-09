@@ -98,21 +98,21 @@ export function BoosterSettleDialog({
             {/* Open Runs */}
             <div className="flex items-center justify-between p-3">
               <div className="flex items-center gap-2">
-                <ArrowUpRight className="size-4 text-emerald-400" aria-hidden="true" />
+                <ArrowUpRight className="size-4 text-success-text" aria-hidden="true" />
                 <span>
                   Unpaid Runs ({settlement.openRunsCount} completed)
                 </span>
               </div>
-              <span className="font-mono font-bold text-emerald-400">
+              <span className="font-mono font-bold text-success-text">
                 +{money(settlement.openRunsTotal)}
               </span>
             </div>
 
             {/* Active Deductions (Loans / Fines / Advances) */}
             {settlement.deductAdjustmentsCount > 0 && (
-              <div className="flex items-center justify-between p-3 bg-rose-500/5">
+              <div className="flex items-center justify-between p-3 bg-destructive/5">
                 <div className="flex items-center gap-2">
-                  <ArrowDownRight className="size-4 text-rose-400" aria-hidden="true" />
+                  <ArrowDownRight className="size-4 text-danger-text" aria-hidden="true" />
                   <div>
                     <span>Active Debt Deductions ({settlement.deductAdjustmentsCount})</span>
                     <small className="block text-[11px] text-muted-foreground">
@@ -120,7 +120,7 @@ export function BoosterSettleDialog({
                     </small>
                   </div>
                 </div>
-                <span className="font-mono font-bold text-rose-400">
+                <span className="font-mono font-bold text-danger-text">
                   -{money(settlement.deductAdjustmentsTotal)}
                 </span>
               </div>
@@ -130,10 +130,10 @@ export function BoosterSettleDialog({
             {settlement.addAdjustmentsCount > 0 && (
               <div className="flex items-center justify-between p-3">
                 <div className="flex items-center gap-2">
-                  <ArrowUpRight className="size-4 text-sky-400" aria-hidden="true" />
+                  <ArrowUpRight className="size-4 text-info-text" aria-hidden="true" />
                   <span>Credit Bonuses ({settlement.addAdjustmentsCount})</span>
                 </div>
-                <span className="font-mono font-bold text-sky-400">
+                <span className="font-mono font-bold text-info-text">
                   +{money(settlement.addAdjustmentsTotal)}
                 </span>
               </div>
@@ -164,10 +164,10 @@ export function BoosterSettleDialog({
               </div>
 
               {/* Cash Conversion Highlight Card */}
-              <div className="rounded-lg bg-sky-950/20 border border-sky-500/30 p-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="rounded-lg bg-primary/15 border border-primary/30 p-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <span className="text-xs text-sky-300/80 font-medium">Converted Payout Value:</span>
-                  <div className="text-xl sm:text-2xl font-black font-mono text-sky-300">
+                  <span className="text-xs text-info-text/80 font-medium">Converted Payout Value:</span>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-info-text">
                     {mmk(cashAmountMmk)}
                   </div>
                   <span className="text-[11px] text-muted-foreground">
@@ -177,7 +177,7 @@ export function BoosterSettleDialog({
                 {booster.storedCash > 0 && (
                   <div className="text-right">
                     <span className="text-[11px] text-muted-foreground block">Currently in Vault:</span>
-                    <strong className="text-amber-400 font-mono text-sm">{mmk(booster.storedCash)}</strong>
+                    <strong className="text-warning-text font-mono text-sm">{mmk(booster.storedCash)}</strong>
                   </div>
                 )}
               </div>
@@ -186,17 +186,17 @@ export function BoosterSettleDialog({
 
           {/* Result Card for Deficit */}
           {settlement.isDeficit ? (
-            <Alert variant="destructive" className="bg-rose-950/20 border-rose-500/30">
-              <AlertCircle className="size-4 text-rose-400" />
-              <AlertTitle className="text-rose-200">Booster is in Deficit</AlertTitle>
-              <AlertDescription className="text-rose-300 text-xs space-y-1 mt-1">
+            <Alert variant="destructive" className="bg-destructive/15 border-destructive/30">
+              <AlertCircle className="size-4 text-danger-text" />
+              <AlertTitle className="text-danger-text">Booster is in Deficit</AlertTitle>
+              <AlertDescription className="text-danger-text text-xs space-y-1 mt-1">
                 <p>
                   Current balance is <strong className="font-mono font-bold">{money(settlement.currentBalance)}</strong>.
                 </p>
                 <p>
                   Settling will apply <strong>{money(settlement.openRunsTotal)}</strong> in completed runs toward reducing their debt. Remaining debt after settlement: <strong className="font-mono font-bold">{money(settlement.remainingDebt)}</strong>.
                 </p>
-                <p className="font-semibold pt-1 text-rose-200">
+                <p className="font-semibold pt-1 text-danger-text">
                   ⚠️ No gold will be traded in-game.
                 </p>
               </AlertDescription>
@@ -217,7 +217,7 @@ export function BoosterSettleDialog({
           {settlement.isDeficit ? (
             <Button
               type="button"
-              className="bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md"
+              className="bg-destructive/90 hover:bg-destructive/90 text-white font-bold shadow-md"
               onClick={handlePayNow}
             >
               <CheckCircle2 className="size-4 mr-1.5" aria-hidden="true" />
@@ -228,7 +228,7 @@ export function BoosterSettleDialog({
               <Button
                 type="button"
                 variant="outline"
-                className="font-bold border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 gap-1.5"
+                className="font-bold border-warning/40 bg-warning/10 hover:bg-warning/20 text-warning-text gap-1.5"
                 onClick={handleHoldCash}
                 disabled={numericRate <= 0}
                 title="Settle runs and store the converted MMK amount in the booster's vault"
@@ -238,7 +238,7 @@ export function BoosterSettleDialog({
               </Button>
               <Button
                 type="button"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md gap-1.5"
+                className="bg-success/90 hover:bg-success text-white font-bold shadow-md gap-1.5"
                 onClick={handlePayNow}
               >
                 <Banknote className="size-4" aria-hidden="true" />

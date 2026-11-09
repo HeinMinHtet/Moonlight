@@ -25,11 +25,11 @@ import { toast } from "sonner";
 
 const CARD_COLORS = {
   default: "bg-card/90 border-border text-foreground",
-  blue: "bg-sky-950/30 border-sky-500/30 text-sky-100",
-  purple: "bg-purple-950/30 border-purple-500/30 text-purple-100",
-  emerald: "bg-emerald-950/30 border-emerald-500/30 text-emerald-100",
-  amber: "bg-amber-950/30 border-amber-500/30 text-amber-100",
-  rose: "bg-rose-950/30 border-rose-500/30 text-rose-100"
+  blue: "bg-primary/15 border-primary/30 text-info-text",
+  purple: "bg-special/15 border-special/30 text-special-text",
+  emerald: "bg-success/15 border-success/30 text-success-text",
+  amber: "bg-warning/15 border-warning/30 text-warning-text",
+  rose: "bg-destructive/15 border-destructive/30 text-danger-text"
 };
 
 const COLOR_MENU_ITEMS = [
@@ -236,7 +236,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
       className={cn(
         "group relative flex flex-col rounded-xl border p-4 shadow-sm hover:shadow-md transition-all",
         colorClass,
-        note.pinned && "ring-1 ring-amber-400/40"
+        note.pinned && "ring-1 ring-warning/40"
       )}
     >
       {/* Header: Normal mode vs Edit Mode for Title, Date & Time */}
@@ -368,10 +368,10 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
               <Badge
                 variant="outline"
                 onClick={handleStartEdit}
-                className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-sky-500/15 text-sky-300 border-sky-500/30 flex items-center gap-1 cursor-pointer hover:bg-sky-500/25 transition-colors"
+                className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-primary/15 text-info-text border-primary/30 flex items-center gap-1 cursor-pointer hover:bg-primary/25 transition-colors"
                 title="Click to edit raid time"
               >
-                <Clock className="size-3 text-sky-400" />
+                <Clock className="size-3 text-info-text" />
                 {note.raidTime}
               </Badge>
             )}
@@ -391,7 +391,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
             {note.archived && (
               <Badge
                 variant="outline"
-                className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                className="px-1.5 py-0.5 text-[10px] font-semibold bg-success/15 text-success-text border-success/30"
               >
                 Completed
               </Badge>
@@ -419,12 +419,12 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
               className={cn(
                 "size-7 transition-opacity ml-0.5",
                 note.pinned
-                  ? "text-amber-400 fill-amber-400 opacity-100"
-                  : "text-muted-foreground opacity-60 hover:opacity-100 hover:text-amber-400"
+                  ? "text-warning-text fill-warning-text opacity-100"
+                  : "text-muted-foreground opacity-60 hover:opacity-100 hover:text-warning-text"
               )}
               title={note.pinned ? "Unpin note" : "Pin note"}
             >
-              {note.pinned ? <Pin className="size-3.5 fill-amber-400" /> : <PinOff className="size-3.5" />}
+              {note.pinned ? <Pin className="size-3.5 fill-warning-text" /> : <PinOff className="size-3.5" />}
             </Button>
           </div>
         </div>
@@ -443,7 +443,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
             <div
               className={cn(
                 "h-full transition-all duration-300",
-                percent === 100 ? "bg-emerald-500" : "bg-primary"
+                percent === 100 ? "bg-success" : "bg-primary"
               )}
               style={{ width: `${percent}%` }}
             />
@@ -528,13 +528,13 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
                       onClick={(e) => handleCopyBuyerName(item, e)}
                       className={cn(
                         "p-1.5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-black/15 transition-colors opacity-100",
-                        copiedItemId === item.id && "text-emerald-400 hover:text-emerald-400"
+                        copiedItemId === item.id && "text-success-text hover:text-success-text"
                       )}
                       title={`Copy ${item.text}`}
                       aria-label={`Copy ${item.text}`}
                     >
                       {copiedItemId === item.id ? (
-                        <Check className="size-3.5 text-emerald-400" />
+                        <Check className="size-3.5 text-success-text" />
                       ) : (
                         <Copy className="size-3.5" />
                       )}
@@ -602,7 +602,7 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
           className="h-7 px-2 text-xs hover:text-primary gap-1"
           title="Copy title, time and buyer names to clipboard"
         >
-          {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+          {copied ? <Check className="size-3.5 text-success-text" /> : <Copy className="size-3.5" />}
           <span>{copied ? "Copied" : "Copy list"}</span>
         </Button>
 
@@ -647,8 +647,8 @@ export function RaidNoteCard({ note, raidNoteTitles = [], buyerPurchaseTypes = [
             className={cn(
               "size-7 transition-colors",
               note.archived
-                ? "text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10"
-                : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"
+                ? "text-muted-foreground hover:text-info-text hover:bg-primary/10"
+                : "text-muted-foreground hover:text-success-text hover:bg-success/10"
             )}
             title={note.archived ? "Restore to Active" : "Mark as Completed"}
           >

@@ -236,9 +236,9 @@ function parseTimeToMinutes(timeStr) {
             <span className="font-bold text-foreground">{stats.totalBuyers}</span>
           </div>
           <div className="px-2.5 py-1 rounded-md bg-card border border-border flex items-center gap-1.5 font-mono">
-            <CheckCircle2 className="size-3 text-emerald-400" />
+            <CheckCircle2 className="size-3 text-success-text" />
             <span className="text-muted-foreground">Completed:</span>
-            <span className="font-bold text-emerald-400">
+            <span className="font-bold text-success-text">
               {stats.checkedBuyers} ({stats.percent}%)
             </span>
           </div>
@@ -312,7 +312,7 @@ function parseTimeToMinutes(timeStr) {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
                 statusTab === "completed"
-                  ? "bg-card text-emerald-400 font-semibold shadow-xs border border-border/50"
+                  ? "bg-card text-success-text font-semibold shadow-xs border border-border/50"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -322,7 +322,7 @@ function parseTimeToMinutes(timeStr) {
                 className={cn(
                   "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
                   statusTab === "completed"
-                    ? "bg-emerald-500/15 text-emerald-400 font-bold"
+                    ? "bg-success/15 text-success-text font-bold"
                     : "bg-muted/80 text-muted-foreground"
                 )}
               >
@@ -490,8 +490,8 @@ function parseTimeToMinutes(timeStr) {
           {/* Pinned Notes Section (Active tab only) */}
           {statusTab === "active" && pinnedNotes.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 tracking-wider uppercase">
-                <Pin className="size-3.5 fill-amber-400" />
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-warning-text tracking-wider uppercase">
+                <Pin className="size-3.5 fill-warning-text" />
                 Pinned ({pinnedNotes.length})
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -517,8 +517,8 @@ function parseTimeToMinutes(timeStr) {
                   Others ({otherNotes.length})
                 </div>
               ) : statusTab === "completed" ? (
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 tracking-wider uppercase">
-                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-success-text tracking-wider uppercase">
+                  <CheckCircle2 className="size-3.5 text-success-text" />
                   Completed Notes ({otherNotes.length})
                 </div>
               ) : null}

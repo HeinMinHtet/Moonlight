@@ -197,56 +197,56 @@ export function BoosterPayoutPage({
               <>
                 <div className="border-t-2 border-t-sky-400/80">
                   <span className="batch-label">Total current balance</span>
-                  <strong className={adminTotalCurrentBalance < 0 ? "text-rose-400" : "text-sky-300"}>
+                  <strong className={adminTotalCurrentBalance < 0 ? "text-danger-text" : "text-info-text"}>
                     {money(adminTotalCurrentBalance)}
                   </strong>
                 </div>
                 <div className="border-t-2 border-t-emerald-400/80">
                   <span className="batch-label">Held in vault</span>
-                  <strong className="text-emerald-300 font-mono">
+                  <strong className="text-success-text font-mono">
                     {mmk(adminTotalStoredCash)}
                   </strong>
                 </div>
                 <div className="border-t-2 border-t-amber-400/80">
                   <span className="batch-label">Filtered open payout</span>
-                  <strong className="text-amber-300">{money(openTotal)}</strong>
+                  <strong className="text-warning-text">{money(openTotal)}</strong>
                 </div>
                 <div className="border-t-2 border-t-sky-500/80">
                   <span className="batch-label">Boosters unpaid</span>
-                  <strong className="text-sky-300">{unpaidBoosterCount}</strong>
+                  <strong className="text-info-text">{unpaidBoosterCount}</strong>
                 </div>
                 <div className="border-t-2 border-t-emerald-500/80">
                   <span className="batch-label">Paid this week</span>
-                  <strong className="text-emerald-300">{money(paidThisWeek)}</strong>
+                  <strong className="text-success-text">{money(paidThisWeek)}</strong>
                 </div>
               </>
             ) : (
               <>
                 <div className="border-t-2 border-t-emerald-400/80">
                   <span className="batch-label">Stored cash in vault</span>
-                  <strong className="text-emerald-300 font-mono text-base sm:text-lg">
+                  <strong className="text-success-text font-mono text-base sm:text-lg">
                     {mmk(personalStoredCash)}
                   </strong>
                 </div>
                 <div className="border-t-2 border-t-sky-400/80">
                   <span className="batch-label">Current balance</span>
-                  <strong className={personalCurrentBalance < 0 ? "text-rose-400" : "text-sky-300"}>
+                  <strong className={personalCurrentBalance < 0 ? "text-danger-text" : "text-info-text"}>
                     {money(personalCurrentBalance)}
                   </strong>
                 </div>
                 <div className="border-t-2 border-t-amber-400/80">
                   <span className="batch-label">Unpaid runs</span>
-                  <strong className="text-amber-300">{money(personalUnpaidBalance)}</strong>
+                  <strong className="text-warning-text">{money(personalUnpaidBalance)}</strong>
                 </div>
                 <div className="border-t-2 border-t-indigo-400/80">
                   <span className="batch-label">Net adjustments</span>
                   <strong
                     className={
                       personalNetAdjustments > 0
-                        ? "text-emerald-300"
+                        ? "text-success-text"
                         : personalNetAdjustments < 0
-                        ? "text-rose-300"
-                        : "text-slate-300"
+                        ? "text-danger-text"
+                        : "text-secondary-foreground"
                     }
                   >
                     {personalNetAdjustments > 0 ? `+${money(personalNetAdjustments)}` : money(personalNetAdjustments)}
@@ -254,7 +254,7 @@ export function BoosterPayoutPage({
                 </div>
                 <div className="border-t-2 border-t-emerald-500/80">
                   <span className="batch-label">Total earned</span>
-                  <strong className="text-emerald-300">{money(personalEarnedBalance)}</strong>
+                  <strong className="text-success-text">{money(personalEarnedBalance)}</strong>
                 </div>
               </>
             )}
@@ -319,12 +319,12 @@ export function BoosterPayoutPage({
               ) : filters.view === "vault" ? (
                 <section className="p-4 space-y-6" aria-label="Personal stored cash vault">
                   {/* Personal Vault Summary Card */}
-                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-5 flex flex-wrap items-center justify-between gap-4">
+                  <div className="rounded-2xl border border-success/30 bg-success/15 p-5 flex flex-wrap items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-success-text uppercase tracking-wider">
                         My Stored Cash Balance in Vault
                       </span>
-                      <div className="text-2xl sm:text-4xl font-black font-mono text-emerald-300">
+                      <div className="text-2xl sm:text-4xl font-black font-mono text-success-text">
                         {mmk(personalStoredCash)}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -334,11 +334,11 @@ export function BoosterPayoutPage({
                     <div className="flex items-center gap-4 text-xs font-mono">
                       <div className="rounded-xl border border-border/80 bg-card/60 p-3 text-right">
                         <span className="text-[11px] text-muted-foreground block">Total Stored</span>
-                        <strong className="text-amber-300 text-sm">{mmk(personalVaultDeposits)}</strong>
+                        <strong className="text-warning-text text-sm">{mmk(personalVaultDeposits)}</strong>
                       </div>
                       <div className="rounded-xl border border-border/80 bg-card/60 p-3 text-right">
                         <span className="text-[11px] text-muted-foreground block">Total Paid Out</span>
-                        <strong className="text-emerald-400 text-sm">{mmk(personalVaultWithdraws)}</strong>
+                        <strong className="text-success-text text-sm">{mmk(personalVaultWithdraws)}</strong>
                       </div>
                     </div>
                   </div>
@@ -382,7 +382,7 @@ export function BoosterPayoutPage({
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   {tx.type === "deposit" ? (
-                                    <Badge variant="outline" className="text-[11px] font-bold border-amber-500/40 text-amber-300 bg-amber-500/10">
+                                    <Badge variant="outline" className="text-[11px] font-bold border-warning/40 text-warning-text bg-warning/10">
                                       + Stored in Vault
                                     </Badge>
                                   ) : (
@@ -392,7 +392,7 @@ export function BoosterPayoutPage({
                                   )}
                                 </td>
                                 <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">
-                                  <span className={tx.type === "deposit" ? "text-amber-300" : "text-emerald-400"}>
+                                  <span className={tx.type === "deposit" ? "text-warning-text" : "text-success-text"}>
                                     {tx.type === "deposit" ? `+${mmk(tx.amount)}` : `-${mmk(tx.amount)}`}
                                   </span>
                                 </td>

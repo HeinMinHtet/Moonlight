@@ -68,7 +68,7 @@ export function BoosterVaultWithdrawDialog({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/70 p-4 bg-muted/20">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-success/10 text-success-text border border-success/20">
               <Banknote className="size-5" aria-hidden="true" />
             </div>
             <div>
@@ -95,7 +95,7 @@ export function BoosterVaultWithdrawDialog({
           <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 flex items-center justify-between">
             <div>
               <span className="text-xs text-muted-foreground block">Available in Vault</span>
-              <strong className="text-lg font-mono font-bold text-emerald-400">
+              <strong className="text-lg font-mono font-bold text-success-text">
                 {mmk(currentBalance)}
               </strong>
             </div>
@@ -103,7 +103,7 @@ export function BoosterVaultWithdrawDialog({
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs h-7 px-2.5 font-semibold border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+              className="text-xs h-7 px-2.5 font-semibold border-success/40 text-success-text hover:bg-success/10"
               onClick={handleSetFullAmount}
             >
               Max / Full Amount
@@ -113,7 +113,7 @@ export function BoosterVaultWithdrawDialog({
           {/* Amount to Release */}
           <div className="space-y-1.5">
             <Label htmlFor="withdraw-amount" className="text-xs font-bold">
-              Release Amount (MMK) <span className="text-rose-400">*</span>
+              Release Amount (MMK) <span className="text-danger-text">*</span>
             </Label>
             <div className="relative">
               <Input
@@ -175,7 +175,7 @@ export function BoosterVaultWithdrawDialog({
           {/* Payment Note / Reference */}
           <div className="space-y-1.5">
             <Label htmlFor="withdraw-note" className="text-xs font-bold">
-              Payment Note / Tx Reference <span className="text-rose-400">*</span>
+              Payment Note / Tx Reference <span className="text-danger-text">*</span>
             </Label>
             <Input
               id="withdraw-note"
@@ -204,7 +204,7 @@ export function BoosterVaultWithdrawDialog({
             <Button
               type="submit"
               disabled={isSubmitting || !Number(amount) || Number(amount) <= 0 || Number(amount) > currentBalance}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md gap-1.5"
+              className="bg-success/90 hover:bg-success text-white font-bold shadow-md gap-1.5"
             >
               <CheckCircle2 className="size-4" aria-hidden="true" />
               Confirm Cashout ({mmk(amount)})

@@ -287,7 +287,7 @@ export function SupplierExportDialog({
           <div className="rounded-xl border border-border/70 bg-card/60 p-4 space-y-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-sky-400" aria-hidden="true" />
+                <Sparkles className="size-4 text-info-text" aria-hidden="true" />
                 <h4 className="text-sm font-semibold text-foreground">Instant Export (All Verified)</h4>
               </div>
               <Badge variant="outline" className="font-mono text-xs">
@@ -307,7 +307,7 @@ export function SupplierExportDialog({
                     : "Total Sales Amount"}
                 </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-sm font-bold text-sky-300">
+                  <span className="font-mono text-sm font-bold text-info-text">
                     {money(allFinalPrice)}
                   </span>
                   {exportMode !== "raw" && effectiveAllWithdrawalsTotal > 0 && (
@@ -317,7 +317,7 @@ export function SupplierExportDialog({
                   )}
                 </div>
                 {exportMode !== "raw" && effectiveAllWithdrawalsTotal > 0 && (
-                  <span className="text-[10px] text-emerald-400 font-semibold block">
+                  <span className="text-[10px] text-success-text font-semibold block">
                     Final settled price after pre-withdrawals
                   </span>
                 )}
@@ -339,7 +339,7 @@ export function SupplierExportDialog({
           <div className="rounded-xl border border-border/70 bg-card/60 p-4 space-y-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <Calendar className="size-4 text-emerald-400" aria-hidden="true" />
+                <Calendar className="size-4 text-success-text" aria-hidden="true" />
                 <h4 className="text-sm font-semibold text-foreground">Date Range Export</h4>
               </div>
               <Badge
@@ -422,7 +422,7 @@ export function SupplierExportDialog({
                     : "Selected Range Total"}
                 </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-sm font-bold text-emerald-300">
+                  <span className="font-mono text-sm font-bold text-success-text">
                     {money(dateRangeFinalPrice)}
                   </span>
                   {exportMode !== "raw" && effectiveDateRangeWithdrawalsTotal > 0 && (

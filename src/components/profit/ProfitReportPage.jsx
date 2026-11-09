@@ -113,17 +113,17 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
         <section className="batch-bar profit-stat-bar" aria-label="Profit totals">
           <div className="border-t-2 border-t-emerald-500/80">
             <span className="batch-label">Supplier paid</span>
-            <strong className="text-emerald-300">{money(totals.supplierPaidTotal)}</strong>
+            <strong className="text-success-text">{money(totals.supplierPaidTotal)}</strong>
             <small>{totals.supplierRecordCount} sales rows</small>
           </div>
           <div className="border-t-2 border-t-sky-400/80">
             <span className="batch-label">Booster payouts</span>
-            <strong className="text-sky-300">{money(totals.boosterPayoutTotal)}</strong>
+            <strong className="text-info-text">{money(totals.boosterPayoutTotal)}</strong>
             <small>{totals.boosterRecordCount} payout rows</small>
           </div>
           <div className="border-t-2 border-t-purple-500/80">
             <span className="batch-label">External expenses</span>
-            <strong className="text-purple-300">{money(totals.externalExpenseTotal)}</strong>
+            <strong className="text-special-text">{money(totals.externalExpenseTotal)}</strong>
             <small>
               {totals.externalExpenseCount} row{totals.externalExpenseCount === 1 ? "" : "s"}
               {totals.externalExpenseTotal > 0 && ` (Raid: ${money(totals.raidPaymentTotal)}, M+: ${money(totals.outsourcePaymentTotal)})`}
@@ -138,7 +138,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
                 </Badge>
               )}
             </div>
-            <strong className={totals.netProfit < 0 ? "text-rose-300" : "text-emerald-300"}>{money(totals.netProfit)}</strong>
+            <strong className={totals.netProfit < 0 ? "text-danger-text" : "text-success-text"}>{money(totals.netProfit)}</strong>
             <small>Revenue minus payouts & expenses</small>
           </div>
         </section>
@@ -166,7 +166,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
                         <span className="font-medium text-foreground">{periodLabel(row.period, report.groupBy)}</span>
                         <div className="h-1 w-full max-w-28 rounded-full bg-muted overflow-hidden" title={`Relative volume: ${Math.round((Number(row.supplierPaidTotal || 0) / maxSupplierTotal) * 100)}%`}>
                           <div
-                            className="h-full rounded-full bg-emerald-400/80 transition-all duration-300"
+                            className="h-full rounded-full bg-success/80 transition-all duration-300"
                             style={{ width: `${Math.max(6, Math.min(100, Math.round((Number(row.supplierPaidTotal || 0) / maxSupplierTotal) * 100)))}%` }}
                           />
                         </div>
@@ -174,7 +174,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
                     </TableCell>
                     <TableCell className="font-mono tabular-nums">{money(row.supplierPaidTotal)}</TableCell>
                     <TableCell className="font-mono tabular-nums">{money(row.boosterPayoutTotal)}</TableCell>
-                    <TableCell className="font-mono tabular-nums text-purple-300">
+                    <TableCell className="font-mono tabular-nums text-special-text">
                       <div className="flex flex-col">
                         <span>{money(row.externalExpenseTotal)}</span>
                         {row.externalExpenseTotal > 0 && (
@@ -192,7 +192,7 @@ export function ProfitReportPage({ isAdmin, refreshVersion }) {
                         {Number(row.supplierPaidTotal || 0) > 0 && (
                           <span className={cn(
                             "text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold",
-                            row.netProfit >= 0 ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"
+                            row.netProfit >= 0 ? "bg-success/15 text-success-text" : "bg-destructive/15 text-danger-text"
                           )}>
                             {Math.round((row.netProfit / row.supplierPaidTotal) * 100)}%
                           </span>

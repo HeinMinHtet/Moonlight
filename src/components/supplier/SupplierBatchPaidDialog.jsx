@@ -100,10 +100,10 @@ export function SupplierBatchPaidDialog({
         <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
           {/* Warnings */}
           {warnings.length > 0 && (
-            <Alert variant="warning" className="bg-amber-950/20 border-amber-500/30">
-              <AlertCircle className="size-4 text-amber-400" />
-              <AlertTitle className="text-amber-200">Review Warnings</AlertTitle>
-              <AlertDescription className="text-amber-300 text-xs space-y-0.5 mt-1">
+            <Alert variant="warning" className="bg-warning/15 border-warning/30">
+              <AlertCircle className="size-4 text-warning-text" />
+              <AlertTitle className="text-warning-text">Review Warnings</AlertTitle>
+              <AlertDescription className="text-warning-text text-xs space-y-0.5 mt-1">
                 {warnings.map((w, i) => (
                   <p key={i}>• {w}</p>
                 ))}
@@ -154,7 +154,7 @@ export function SupplierBatchPaidDialog({
                   </p>
                   <div className="flex items-center justify-between pl-6 pt-1 text-xs font-mono border-t border-border/40 mt-1">
                     <span className="text-muted-foreground">Net payable:</span>
-                    <span className={cn("font-bold", isDeficit ? "text-rose-400" : "text-emerald-300")}>
+                    <span className={cn("font-bold", isDeficit ? "text-danger-text" : "text-success-text")}>
                       {money(netWithWithdrawals)}
                     </span>
                   </div>
@@ -195,7 +195,7 @@ export function SupplierBatchPaidDialog({
                   </p>
                   <div className="flex items-center justify-between pl-6 pt-1 text-xs font-mono border-t border-border/40 mt-1">
                     <span className="text-muted-foreground">Gross payable:</span>
-                    <span className="font-bold text-emerald-300">
+                    <span className="font-bold text-success-text">
                       {money(verifiedSalesTotal)}
                     </span>
                   </div>
@@ -212,18 +212,18 @@ export function SupplierBatchPaidDialog({
           <div className="rounded-xl border border-border/70 bg-card/60 divide-y divide-border/40 text-xs sm:text-sm">
             <div className="flex items-center justify-between p-3">
               <div className="flex items-center gap-2">
-                <ArrowUpRight className="size-4 text-emerald-400" aria-hidden="true" />
+                <ArrowUpRight className="size-4 text-success-text" aria-hidden="true" />
                 <span>Verified sales total ({verifiedRecords.length} rows)</span>
               </div>
-              <span className="font-mono font-bold text-emerald-400">
+              <span className="font-mono font-bold text-success-text">
                 +{money(verifiedSalesTotal)}
               </span>
             </div>
 
             {hasActiveWithdrawals && settleWithdrawals && (
-              <div className="flex items-center justify-between p-3 bg-amber-500/5">
+              <div className="flex items-center justify-between p-3 bg-warning/5">
                 <div className="flex items-center gap-2">
-                  <ArrowDownRight className="size-4 text-amber-400" aria-hidden="true" />
+                  <ArrowDownRight className="size-4 text-warning-text" aria-hidden="true" />
                   <div>
                     <span>Active withdraw balance offset ({activeWithdrawalsCount})</span>
                     <small className="block text-[11px] text-muted-foreground">
@@ -231,7 +231,7 @@ export function SupplierBatchPaidDialog({
                     </small>
                   </div>
                 </div>
-                <span className="font-mono font-bold text-amber-400">
+                <span className="font-mono font-bold text-warning-text">
                   -{money(activeWithdrawalsTotal)}
                 </span>
               </div>
@@ -240,17 +240,17 @@ export function SupplierBatchPaidDialog({
 
           {/* Result Card */}
           {hasActiveWithdrawals && settleWithdrawals && isDeficit ? (
-            <Alert variant="destructive" className="bg-rose-950/20 border-rose-500/30">
-              <AlertCircle className="size-4 text-rose-400" />
-              <AlertTitle className="text-rose-200">Withdrawals Exceed Sales Total</AlertTitle>
-              <AlertDescription className="text-rose-300 text-xs space-y-1 mt-1">
+            <Alert variant="destructive" className="bg-destructive/15 border-destructive/30">
+              <AlertCircle className="size-4 text-danger-text" />
+              <AlertTitle className="text-danger-text">Withdrawals Exceed Sales Total</AlertTitle>
+              <AlertDescription className="text-danger-text text-xs space-y-1 mt-1">
                 <p>
                   Active withdraw balance ({money(activeWithdrawalsTotal)}) exceeds verified sales ({money(verifiedSalesTotal)}).
                 </p>
                 <p>
                   Settling will apply <strong>{money(verifiedSalesTotal)}</strong> toward reducing supplier debt. Remaining withdraw balance after settlement: <strong className="font-mono font-bold">{money(Math.abs(netWithWithdrawals))}</strong>.
                 </p>
-                <p className="font-semibold pt-1 text-rose-200">
+                <p className="font-semibold pt-1 text-danger-text">
                   ⚠️ No gold will be traded in-game.
                 </p>
               </AlertDescription>
@@ -286,7 +286,7 @@ export function SupplierBatchPaidDialog({
             className={cn(
               "font-bold shadow-md",
               hasActiveWithdrawals && settleWithdrawals && isDeficit
-                ? "bg-rose-600 hover:bg-rose-700 text-white"
+                ? "bg-destructive/90 hover:bg-destructive/90 text-white"
                 : "bg-primary text-primary-foreground"
             )}
             onClick={handleConfirm}

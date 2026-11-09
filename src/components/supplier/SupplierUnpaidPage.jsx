@@ -200,7 +200,7 @@ export function SupplierUnpaidPage({
             </div>
 
             {balanceStats.activeWithdrawalsTotal > 0 && (
-              <span className="text-xs font-semibold text-amber-300">
+              <span className="text-xs font-semibold text-warning-text">
                 {balanceStats.activeWithdrawalsCount} active withdrawal{balanceStats.activeWithdrawalsCount === 1 ? "" : "s"}
               </span>
             )}
@@ -342,11 +342,11 @@ export function SupplierUnpaidPage({
 
                     <div className="text-xs font-mono font-semibold">
                       {withdrawalStatusTab === "active" ? (
-                        <span className="text-amber-300">
+                        <span className="text-warning-text">
                           Active total: {money(balanceStats.activeWithdrawalsTotal)}
                         </span>
                       ) : (
-                        <span className="text-emerald-400">
+                        <span className="text-success-text">
                           Settled total: {money(balanceStats.settledWithdrawalsTotal)}
                         </span>
                       )}

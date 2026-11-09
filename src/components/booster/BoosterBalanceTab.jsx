@@ -216,7 +216,7 @@ export function BoosterBalanceTab({
               Total Gold Owed: <strong className="text-foreground text-sm font-mono">{money(totalCurrentBalance)}</strong>
             </span>
             <span className="text-muted-foreground">
-              Total Held MMK: <strong className="text-emerald-400 text-sm font-mono">{mmk(totalStoredCash)}</strong>
+              Total Held MMK: <strong className="text-success-text text-sm font-mono">{mmk(totalStoredCash)}</strong>
             </span>
             <Badge variant="admin">{boosterBalances.length} Boosters</Badge>
           </div>
@@ -254,13 +254,13 @@ export function BoosterBalanceTab({
                           </Badge>
                         )}
                         {b.storedCash > 0 && (
-                          <Badge variant="outline" className="text-[10px] py-0 px-1 border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
+                          <Badge variant="outline" className="text-[10px] py-0 px-1 border-success/40 text-success-text bg-success/10">
                             Vault Active
                           </Badge>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs sm:text-sm text-slate-300">
+                    <td className="px-4 py-3 text-right font-mono text-xs sm:text-sm text-secondary-foreground">
                       <div>{money(b.openRunsTotal)}</div>
                       <small className="text-[11px] text-muted-foreground">
                         {b.openRunsCount} open run{b.openRunsCount === 1 ? "" : "s"}
@@ -269,8 +269,8 @@ export function BoosterBalanceTab({
                     <td className="px-4 py-3 text-right font-mono text-xs sm:text-sm">
                       <div
                         className={cn(
-                          b.adjustmentsTotal > 0 && "text-emerald-400 font-bold",
-                          b.adjustmentsTotal < 0 && "text-rose-400 font-bold",
+                          b.adjustmentsTotal > 0 && "text-success-text font-bold",
+                          b.adjustmentsTotal < 0 && "text-danger-text font-bold",
                           b.adjustmentsTotal === 0 && "text-muted-foreground"
                         )}
                       >
@@ -283,9 +283,9 @@ export function BoosterBalanceTab({
                     <td className="px-4 py-3 text-right font-mono text-sm sm:text-base font-bold">
                       <span
                         className={cn(
-                          b.currentBalance > 0 && "text-sky-300",
-                          b.currentBalance < 0 && "text-rose-400",
-                          b.currentBalance === 0 && "text-slate-400"
+                          b.currentBalance > 0 && "text-info-text",
+                          b.currentBalance < 0 && "text-danger-text",
+                          b.currentBalance === 0 && "text-muted-foreground"
                         )}
                       >
                         {money(b.currentBalance)}
@@ -293,7 +293,7 @@ export function BoosterBalanceTab({
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-bold">
                       {b.storedCash > 0 ? (
-                        <span className="text-emerald-400 text-sm sm:text-base">
+                        <span className="text-success-text text-sm sm:text-base">
                           {mmk(b.storedCash)}
                         </span>
                       ) : (
@@ -312,7 +312,7 @@ export function BoosterBalanceTab({
                               variant="default"
                               size="sm"
                               type="button"
-                              className="h-7 px-2.5 text-xs font-bold shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white"
+                              className="h-7 px-2.5 text-xs font-bold shadow-xs bg-success/90 hover:bg-success text-white"
                               onClick={() => handleOpenSettleDialog(b)}
                               disabled={!permissions.canMarkBoosterPaid}
                               title="Settle runs (Pay Now or Hold in Vault)"
@@ -324,7 +324,7 @@ export function BoosterBalanceTab({
                               variant="outline"
                               size="sm"
                               type="button"
-                              className="h-7 px-2.5 text-xs font-semibold border-rose-500/40 text-rose-300 bg-rose-500/10 hover:bg-rose-500/20"
+                              className="h-7 px-2.5 text-xs font-semibold border-destructive/40 text-danger-text bg-destructive/10 hover:bg-destructive/20"
                               onClick={() => handleOpenSettleDialog(b)}
                               disabled={!permissions.canMarkBoosterPaid}
                             >
@@ -342,7 +342,7 @@ export function BoosterBalanceTab({
                               variant="default"
                               size="sm"
                               type="button"
-                              className="h-7 px-2.5 text-xs font-bold shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1"
+                              className="h-7 px-2.5 text-xs font-bold shadow-xs bg-success/90 hover:bg-success text-white gap-1"
                               onClick={() => handleOpenWithdrawDialog(b)}
                               disabled={!permissions.canMarkBoosterPaid}
                               title="Release held MMK cash to booster"
@@ -378,7 +378,7 @@ export function BoosterBalanceTab({
       <Card className="overflow-hidden border-border/80 bg-card/90">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4 bg-muted/20">
           <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-success/10 text-success-text border border-success/20">
               <Lock className="size-4" aria-hidden="true" />
             </div>
             <div>
@@ -422,7 +422,7 @@ export function BoosterBalanceTab({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {tx.type === "deposit" ? (
-                        <Badge variant="outline" className="gap-1 text-[11px] font-bold border-amber-500/40 text-amber-300 bg-amber-500/10">
+                        <Badge variant="outline" className="gap-1 text-[11px] font-bold border-warning/40 text-warning-text bg-warning/10">
                           <Lock className="size-3" aria-hidden="true" />
                           + Vault Deposit
                         </Badge>
@@ -439,7 +439,7 @@ export function BoosterBalanceTab({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">
-                      <span className={tx.type === "deposit" ? "text-amber-300" : "text-emerald-400"}>
+                      <span className={tx.type === "deposit" ? "text-warning-text" : "text-success-text"}>
                         {tx.type === "deposit" ? `+${mmk(tx.amount)}` : `-${mmk(tx.amount)}`}
                       </span>
                     </td>
@@ -548,7 +548,7 @@ export function BoosterBalanceTab({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">
-                      <span className={adj.type === "add" ? "text-emerald-400" : "text-rose-400"}>
+                      <span className={adj.type === "add" ? "text-success-text" : "text-danger-text"}>
                         {adj.type === "add" ? `+${money(adj.amount)}` : `-${money(adj.amount)}`}
                       </span>
                     </td>
@@ -565,7 +565,7 @@ export function BoosterBalanceTab({
                             variant="ghost"
                             size="icon"
                             type="button"
-                            className="size-7 text-slate-400 hover:text-white"
+                            className="size-7 text-muted-foreground hover:text-white"
                             onClick={() => handleOpenEditDialog(adj)}
                             disabled={!permissions.canMarkBoosterPaid}
                             title="Edit adjustment"
@@ -577,7 +577,7 @@ export function BoosterBalanceTab({
                             variant="ghost"
                             size="icon"
                             type="button"
-                            className="size-7 text-rose-400 hover:text-rose-200 hover:bg-rose-500/15"
+                            className="size-7 text-danger-text hover:text-danger-text hover:bg-destructive/15"
                             onClick={() => handleDeleteAdjustment(adj)}
                             disabled={!permissions.canMarkBoosterPaid}
                             title="Delete adjustment"

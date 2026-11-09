@@ -110,27 +110,27 @@ export function SupplierPaidHistoryPage({
         <section className="batch-bar history-stat-bar" aria-label="Filtered paid supplier totals">
           <div className="border-t-2 border-t-emerald-500/80">
             <span className="batch-label">Total sales</span>
-            <strong className="text-emerald-300">{money(filteredTotal)}</strong>
+            <strong className="text-success-text">{money(filteredTotal)}</strong>
             <small>{filteredQuantity} item{filteredQuantity === 1 ? "" : "s"} sold</small>
           </div>
           <div className="border-t-2 border-t-sky-400/80">
             <span className="batch-label">Items sold</span>
-            <strong className="text-sky-300">{filteredQuantity}</strong>
+            <strong className="text-info-text">{filteredQuantity}</strong>
             <small>{filteredRecords.length} sales row{filteredRecords.length === 1 ? "" : "s"}</small>
           </div>
           <div className="border-t-2 border-t-sky-400/80">
             <span className="batch-label">Payment batches</span>
-            <strong className="text-sky-300">{batches.length}</strong>
+            <strong className="text-info-text">{batches.length}</strong>
             <small>Completed batches</small>
           </div>
           <div className="border-t-2 border-t-sky-400/80">
             <span className="batch-label">Sales records</span>
-            <strong className="text-sky-300">{filteredRecords.length}</strong>
+            <strong className="text-info-text">{filteredRecords.length}</strong>
             <small>Across {batches.length} batch{batches.length === 1 ? "" : "es"}</small>
           </div>
           <div className="border-t-2 border-t-amber-400/80">
             <span className="batch-label">Paid by</span>
-            <strong className="text-amber-300">{paidByCount}</strong>
+            <strong className="text-warning-text">{paidByCount}</strong>
             <small>Admin{paidByCount === 1 ? "" : "s"}</small>
           </div>
         </section>
@@ -197,7 +197,7 @@ export function SupplierPaidHistoryPage({
           <details className="history-summary-details" open={isFiltered}>
             <summary className="history-summary-toggle">
               <span>Filtered items sales lookup ({filteredItemSummary.length} item type{filteredItemSummary.length === 1 ? "" : "s"})</span>
-              <strong className="text-emerald-300 font-mono font-semibold">{money(filteredTotal)}</strong>
+              <strong className="text-success-text font-mono font-semibold">{money(filteredTotal)}</strong>
             </summary>
             <div className="history-summary-content">
               <table className="history-summary-table">
@@ -219,7 +219,7 @@ export function SupplierPaidHistoryPage({
                         </span>
                       </td>
                       <td className="text-right font-mono">{item.totalQty}</td>
-                      <td className="text-right font-mono font-semibold text-emerald-300">
+                      <td className="text-right font-mono font-semibold text-success-text">
                         {money(item.totalCost)}
                       </td>
                     </tr>
@@ -229,7 +229,7 @@ export function SupplierPaidHistoryPage({
                   <tr>
                     <td colSpan={2}>Filtered total</td>
                     <td className="text-right font-mono">{filteredQuantity}</td>
-                    <td className="text-right font-mono text-emerald-300">{money(filteredTotal)}</td>
+                    <td className="text-right font-mono text-success-text">{money(filteredTotal)}</td>
                   </tr>
                 </tfoot>
               </table>
