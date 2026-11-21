@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api.js";
+import { today as todayIso } from "./utils/format.js";
+import { canSkipPoll } from "./utils/polling.js";
 import { ADMIN_ONLY_TABS, AppTabs, canOpenTab, hashForTab, tabFromHash } from "./components/AppTabs.jsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.jsx";
 import { BoosterPayoutPage } from "./components/booster/BoosterPayoutPage.jsx";
@@ -23,6 +25,9 @@ import { toast as notify } from "sonner";
 
 const POLL_INTERVAL_MS = 15_000;
 const HIDDEN_POLL_CHECK_MS = 60_000;
+// Even when the ledger version is unchanged, do a full refresh this often so
+// session expiry and permission changes are still noticed.
+const FULL_REFRESH_MS = 5 * 60_000;
 
 const initialState = {
   user: null,
@@ -66,6 +71,9 @@ export function App() {
   const pollingRef = useRef(false);
   const foregroundActionRef = useRef(false);
   const dataVersionRef = useRef(0);
+  // Last server ledger version this client fully loaded, and when.
+  const seenLedgerVersionRef = useRef(null);
+  const lastFullPollAtRef = useRef(0);
   // Tab requested in the URL on first load (e.g. #/finance/profit); applied once config is known.
   const initialHashTabRef = useRef(typeof window === "undefined" ? null : tabFromHash(window.location.hash));
 
@@ -161,6 +169,20 @@ export function App() {
     pollingRef.current = true;
     const startedAtVersion = dataVersionRef.current;
     try {
+      // Cheap check first: skip the heavy reload when nothing changed on the server.
+      let ledgerVersion = null;
+      try {
+        ledgerVersion = (await api("/api/ledger-version")).version || null;
+      } catch {
+        ledgerVersion = null; // older server or network blip: fall through to a full refresh
+      }
+      if (canSkipPoll({
+        serverVersion: ledgerVersion,
+        seenVersion: seenLedgerVersionRef.current,
+        lastFullPollAt: lastFullPollAtRef.current,
+        fullRefreshMs: FULL_REFRESH_MS
+      })) return;
+
       const config = await api("/api/config");
       const needsSupplier = config.permissions.supplierRecords && ["supplier", "supplierHistory", "prices", "calculator"].includes(activeTab);
       const needsBoosters = config.permissions.boosterRecords && ["booster", "prices"].includes(activeTab);
@@ -174,6 +196,8 @@ export function App() {
       ]);
 
       if (foregroundActionRef.current || dataVersionRef.current !== startedAtVersion) return;
+      seenLedgerVersionRef.current = ledgerVersion;
+      lastFullPollAtRef.current = Date.now();
       setData((current) => {
         const preserveRateDrafts = activeTab === "prices";
         return {
@@ -391,7 +415,7 @@ export function App() {
     const boosterReviewCount = data.boosterRecords.filter(
       (r) => !r.paid && (!String(r.note || "").trim() || Number(r.totalBalance || 0) <= 0 || Number(r.quantity || 0) > 20)
     ).length;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIso();
     const todayNotesCount = (data.raidNotes || []).filter(
       (n) => !n.archived && n.raidDate === today
     ).length;

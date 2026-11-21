@@ -1,124 +1,37 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+// Loads .env and validates config before any other module reads process.env.
+import "./lib/server/config.js";
+import { randomBytes } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { createServer } from "node:http";
-import { validIsoDate } from "./lib/profitReport.js";
-import {
-  initDb,
-  getConfig,
-  getSupplierRate,
-  getBoosterRate,
-  getSupplierServicesList,
-  getBoosterPricesList,
-  getArmorTypesList,
-  getSupplierGuildsList,
-  updateSupplierGuilds,
-  updateRaidNoteTitles,
-  updateBuyerPurchaseTypes,
-  getSupplierWithdrawalsPayload,
-  insertSupplierWithdrawal,
-  getSupplierWithdrawalById,
-  updateSupplierWithdrawal,
-  deleteSupplierWithdrawal,
-  getSupplierRecordsPayload,
-  insertSupplierRecord,
-  updateSupplierRecord,
-  deleteSupplierRecord,
-  verifyAllSupplierRecords,
-  unverifyAllSupplierRecords,
-  markSupplierRecordsPaid,
-  reopenSupplierPaymentBatch,
-  getBoosterRecordsPayload,
-  insertBoosterRecord,
-  getBoosterRecordById,
-  updateBoosterRecord,
-  deleteBoosterRecord,
-  markBoosterRecordsPaid,
-  settleBoosterBalance,
-  getBoosterAdjustmentsPayload,
-  insertBoosterAdjustment,
-  getBoosterAdjustmentById,
-  updateBoosterAdjustment,
-  deleteBoosterAdjustment,
-  getBoosterCashVaultPayload,
-  insertBoosterVaultTransaction,
-  withdrawBoosterVaultCash,
-  updateSupplierServices,
-  updateBoosterPrices,
-  updateArmorTypes,
-  getExternalExpensesPayload,
-  insertExternalExpense,
-  getExternalExpenseById,
-  updateExternalExpense,
-  deleteExternalExpense,
-  getRaidNotesPayload,
-  insertRaidNote,
-  getRaidNoteById,
-  updateRaidNote,
-  deleteRaidNote,
-  getProfitReportData,
-  getSessionFromDb,
-  saveSessionToDb,
-  deleteSessionFromDb,
-  pruneExpiredSessions,
-  lineTotal
-} from "./lib/db.js";
+import { initDb, recordUserLogin } from "./lib/db.js";
+import { cookieOptions, getSession, makeCookie, readCookie, setSession } from "./lib/server/auth.js";
+import { DISCORD_ADMIN_ROLE_IDS, DISCORD_BOOSTER_ROLE_IDS, DISCORD_GUILD_ID, OAUTH_STATE_MAX_AGE_MS, PORT, discordReady, root } from "./lib/server/config.js";
+import { sendJson, setSecurityHeaders } from "./lib/server/http.js";
+import { currentLedgerTag } from "./lib/server/ledgerVersion.js";
+import { apiRoutes } from "./lib/server/routes/index.js";
 
-const root = resolve(".");
 const publicDir = join(root, "public");
+
 const distDir = join(root, "dist");
+
 const useViteDevServer = process.argv.includes("--dev");
-
-loadEnv();
-
-const PORT = Number(process.env.PORT || 3000);
-const SESSION_SECRET = process.env.SESSION_SECRET || "local-development-secret";
-if (
-  process.env.NODE_ENV === "production" &&
-  (!process.env.SESSION_SECRET ||
-    process.env.SESSION_SECRET === "local-development-secret" ||
-    process.env.SESSION_SECRET === "change-this-long-random-secret")
-) {
-  console.error(
-    "[SECURITY CRITICAL] Running in production with an unset or default SESSION_SECRET. Set a strong random SESSION_SECRET in your environment before public launch. Exiting."
-  );
-  process.exit(1);
-}
-const SESSION_MAX_AGE_MS = Number(process.env.SESSION_MAX_AGE_HOURS || 12) * 60 * 60 * 1000;
-const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
-const SECURE_COOKIE = process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production";
-const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
-const DISCORD_ADMIN_ROLE_IDS = parseIdList(process.env.DISCORD_ADMIN_ROLE_IDS);
-const DISCORD_BOOSTER_ROLE_IDS = parseIdList(process.env.DISCORD_BOOSTER_ROLE_IDS);
-const sessions = new Map();
-let ledgerVersion = 1;
-
-export function incrementLedgerVersion() {
-  ledgerVersion += 1;
-}
 
 process.on("unhandledRejection", (reason) => {
   console.error("[CRITICAL] Unhandled Promise Rejection:", reason);
 });
+
 process.on("uncaughtException", (error) => {
   console.error("[CRITICAL] Uncaught Exception:", error);
 });
 
-// Periodic pruning of in-memory and database sessions with crash guard
-setInterval(() => {
-  pruneExpiredSessions().catch((err) => {
-    console.error("[CRON ERROR] Session pruning failed:", err.message);
-  });
-  const now = Date.now();
-  for (const [id, session] of sessions.entries()) {
-    if (now > Number(session.expiresAt || 0)) sessions.delete(id);
-  }
-}, 15 * 60 * 1000).unref();
-
 // In-memory sliding-window rate limiting
 const rateLimitBuckets = new Map();
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
 const RATE_LIMIT_MAX_AUTH = 30;
+
 const RATE_LIMIT_MAX_MUTATIONS = 120;
 
 function getClientIp(req) {
@@ -155,215 +68,23 @@ const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
   ".png": "image/png",
-  ".svg": "image/svg+xml"
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".ico": "image/x-icon",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json"
 };
-
-function loadEnv() {
-  const envPath = join(root, ".env");
-  if (!existsSync(envPath)) return;
-  for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-    const [key, ...rest] = trimmed.split("=");
-    if (!process.env[key]) process.env[key] = rest.join("=").trim();
-  }
-}
-
-function parseIdList(value) {
-  return new Set(
-    String(value || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-  );
-}
-
-function discordReady() {
-  return Boolean(
-    process.env.DISCORD_CLIENT_ID &&
-    process.env.DISCORD_CLIENT_SECRET &&
-    process.env.DISCORD_REDIRECT_URI &&
-    DISCORD_GUILD_ID &&
-    (DISCORD_ADMIN_ROLE_IDS.size || DISCORD_BOOSTER_ROLE_IDS.size)
-  );
-}
-
-function sign(value) {
-  return createHmac("sha256", SESSION_SECRET).update(value).digest("base64url");
-}
-
-function makeCookie(payload) {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${encoded}.${sign(encoded)}`;
-}
-
-function readCookie(req, cookieName = "wow_ledger_session") {
-  const header = req.headers.cookie || "";
-  const cookies = Object.fromEntries(
-    header.split(";").map((part) => {
-      const [key, ...value] = part.trim().split("=");
-      return [key, value.join("=")];
-    }).filter(([key]) => key)
-  );
-  const raw = cookies[cookieName];
-  if (!raw || !raw.includes(".")) return null;
-  const [encoded, signature] = raw.split(".");
-  const expectedSig = Buffer.from(sign(encoded));
-  const actualSig = Buffer.from(signature || "");
-  if (expectedSig.length !== actualSig.length || !timingSafeEqual(expectedSig, actualSig)) return null;
-  try {
-    return JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-}
-
-async function setSession(res, session) {
-  const id = randomBytes(24).toString("base64url");
-  const now = Date.now();
-  const sessionObj = {
-    ...session,
-    csrfToken: randomBytes(24).toString("base64url"),
-    createdAt: now,
-    expiresAt: now + SESSION_MAX_AGE_MS
-  };
-  sessions.set(id, sessionObj);
-  await saveSessionToDb(id, sessionObj);
-  res.setHeader("Set-Cookie", `wow_ledger_session=${makeCookie({ id })}; ${cookieOptions(Math.floor(SESSION_MAX_AGE_MS / 1000))}`);
-}
-
-async function clearSession(res, req) {
-  const cookie = readCookie(req);
-  if (cookie?.id) {
-    sessions.delete(cookie.id);
-    await deleteSessionFromDb(cookie.id);
-  }
-  res.setHeader("Set-Cookie", `wow_ledger_session=; ${cookieOptions(0)}`);
-}
-
-async function getSession(req) {
-  const cookie = readCookie(req);
-  if (!cookie?.id) return null;
-  let session = sessions.get(cookie.id) || null;
-  if (!session) {
-    session = await getSessionFromDb(cookie.id);
-    if (session) sessions.set(cookie.id, session);
-  }
-  if (!session) return null;
-  if (Date.now() > Number(session.expiresAt || 0)) {
-    sessions.delete(cookie.id);
-    await deleteSessionFromDb(cookie.id);
-    return null;
-  }
-  return session;
-}
-
-function cookieOptions(maxAge) {
-  return `HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${SECURE_COOKIE ? "; Secure" : ""}`;
-}
-
-function canUseSupplier(session) {
-  return session?.role === "admin";
-}
-
-function canManageAdmin(session) {
-  return session?.role === "admin";
-}
-
-function canUseBooster(session) {
-  return session?.role === "booster" || session?.role === "admin";
-}
-
-function canDeleteBoosterRecord(session, record) {
-  return canManageAdmin(session) || (canUseBooster(session) && !record?.paid && record?.discordId === session?.discordId);
-}
-
-function canEditBoosterRecord(session, record) {
-  return canDeleteBoosterRecord(session, record);
-}
-
-function permissionsFor(session) {
-  return {
-    supplierRecords: canUseSupplier(session),
-    boosterRecords: canUseBooster(session),
-    supplierStatus: canManageAdmin(session),
-    supplierPaid: canManageAdmin(session),
-    supplierDelete: canManageAdmin(session),
-    allBoosterRecords: canManageAdmin(session),
-    boosterPaid: canManageAdmin(session),
-    boosterDelete: canUseBooster(session),
-    profitReport: canManageAdmin(session),
-    priceSettings: canManageAdmin(session),
-    externalExpenses: canManageAdmin(session),
-    raidNotes: canManageAdmin(session)
-  };
-}
-
-async function readJson(req, maxBytes = 1_000_000) {
-  let body = "";
-  for await (const chunk of req) {
-    body += chunk;
-    if (body.length > maxBytes) throw Object.assign(new Error("Request body is too large."), { statusCode: 413 });
-  }
-  if (!body) return {};
-  try {
-    return JSON.parse(body);
-  } catch (error) {
-    throw Object.assign(new Error("Invalid JSON payload."), { statusCode: 400 });
-  }
-}
-
-function sendJson(res, status, payload, etag = null) {
-  setSecurityHeaders(res);
-  res.setHeader("Cache-Control", "no-store");
-  if (etag) {
-    res.setHeader("ETag", `"${etag}"`);
-  }
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify(payload));
-}
-
-function setSecurityHeaders(res) {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "same-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
-  );
-}
-
-function notAllowed(res, error = "You do not have access to this action.") {
-  sendJson(res, 403, { error });
-}
-
-function requireCsrf(req, res, session) {
-  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return true;
-  if (!session) {
-    notAllowed(res, "Sign in with Discord before saving changes.");
-    return false;
-  }
-  const clientToken = Buffer.from(String(req.headers["x-csrf-token"] || ""));
-  const sessionToken = Buffer.from(String(session.csrfToken || ""));
-  if (clientToken.length === 0 || clientToken.length !== sessionToken.length || !timingSafeEqual(clientToken, sessionToken)) {
-    sendJson(res, 403, { error: "Your session changed. Refresh the page, then try again." });
-    return false;
-  }
-  return true;
-}
-
-function publicUser(session) {
-  if (!session) return null;
-  return {
-    role: session.role,
-    discordId: session.discordId,
-    username: session.username,
-    expiresAt: session.expiresAt
-  };
-}
 
 async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
@@ -375,11 +96,16 @@ async function handleApi(req, res, url) {
     }
   }
 
-  if (req.method === "GET" && req.headers["if-none-match"] === `"${ledgerVersion}"`) {
+  // Cheap change check for the UI's background polling: no session or database work.
+  if (pathname === "/api/ledger-version" && req.method === "GET") {
+    return sendJson(res, 200, { version: currentLedgerTag() });
+  }
+
+  if (req.method === "GET" && req.headers["if-none-match"] === `"${currentLedgerTag()}"`) {
     if (["/api/supplier-records", "/api/booster-records", "/api/external-expenses", "/api/raid-notes"].includes(pathname)) {
       setSecurityHeaders(res);
       res.setHeader("Cache-Control", "no-store");
-      res.setHeader("ETag", `"${ledgerVersion}"`);
+      res.setHeader("ETag", `"${currentLedgerTag()}"`);
       res.writeHead(304);
       return res.end();
     }
@@ -387,981 +113,15 @@ async function handleApi(req, res, url) {
 
   const session = await getSession(req);
 
-  if (pathname === "/api/config" && req.method === "GET") {
-    const permissions = permissionsFor(session);
-    const config = await getConfig(session, permissions);
-    return sendJson(res, 200, {
-      discordConfigured: discordReady(),
-      discordOAuthConfigured: Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET && process.env.DISCORD_REDIRECT_URI),
-      discordRolesConfigured: Boolean(DISCORD_GUILD_ID && (DISCORD_ADMIN_ROLE_IDS.size || DISCORD_BOOSTER_ROLE_IDS.size)),
-      user: publicUser(session),
-      csrfToken: session?.csrfToken || null,
-      permissions,
-      ...config
-    });
-  }
-
-  if (pathname === "/api/logout" && req.method === "POST") {
-    if (session && !requireCsrf(req, res, session)) return;
-    await clearSession(res, req);
-    return sendJson(res, 200, { ok: true });
-  }
-
-  if (pathname === "/api/supplier-records" && req.method === "GET") {
-    if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can view the sales ledger.");
-    const payload = await getSupplierRecordsPayload();
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/profit-report" && req.method === "GET") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view profit reporting.");
-    const from = searchParams.get("from") || "";
-    const to = searchParams.get("to") || "";
-    const groupBy = searchParams.get("groupBy") || "weekly";
-    if (!validIsoDate(from) || !validIsoDate(to)) return sendJson(res, 400, { error: "Choose a valid profit report date range." });
-    if (from > to) return sendJson(res, 400, { error: "Profit report start date must be before the end date." });
-    if (!["weekly", "monthly", "daily"].includes(groupBy)) return sendJson(res, 400, { error: "Profit reports can be grouped weekly or monthly." });
-    const report = await getProfitReportData(from, to, groupBy);
-    return sendJson(res, 200, report);
-  }
-
-  if (pathname === "/api/supplier-records" && req.method === "POST") {
-    if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can add sales records.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    if (!body.buyerName || !body.serviceType || !body.quantity) return sendJson(res, 400, { error: "Buyer character, service, and quantity are required." });
-    const quantity = Number(body.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be greater than 0." });
-    const serviceType = String(body.serviceType || "").trim();
-    const services = await getSupplierServicesList();
-    if (!services.some((service) => service.active !== false && service.type === serviceType)) {
-      return sendJson(res, 400, { error: "Choose an active service for this sales record." });
-    }
-    const armorTypes = await getArmorTypesList();
-    const defaultArmor = armorTypes.find((item) => item.isDefault)?.name || armorTypes.find((item) => item.active !== false)?.name || "No stack";
-    const armorType = String(body.armorType || defaultArmor).trim();
-    const armorExists = armorTypes.some((armor) => (typeof armor === "object" ? armor.name : armor) === armorType && (typeof armor === "object" ? armor.active !== false : true));
-    if (!armorExists) return sendJson(res, 400, { error: "Choose a valid armor stack." });
-
-    const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
-    if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid sales record date." });
-
-    const rateAtRecord = await getSupplierRate(serviceType);
-    const record = {
-      id: randomBytes(10).toString("base64url"),
-      date,
-      buyerName: String(body.buyerName).trim(),
-      serviceType,
-      quantity,
-      armorType,
-      correct: false,
-      paid: false,
-      note: String(body.note || "").trim(),
-      rateAtRecord,
-      totalCost: lineTotal(rateAtRecord, quantity),
-      createdByDiscordId: session.discordId,
-      createdByName: session.username,
-      createdAt: new Date().toISOString()
-    };
-
-    await insertSupplierRecord(record);
-    incrementLedgerVersion();
-    const { summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 201, { record, summary });
-  }
-
-  if (pathname === "/api/supplier-records/verify-all" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can verify sales records.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const selectedIds = Array.isArray(body.ids)
-      ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
-      : null;
-
-    const result = await verifyAllSupplierRecords(selectedIds);
-    if (result.error) return sendJson(res, 400, { error: result.error });
-    incrementLedgerVersion();
-
-    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { verifiedCount: result.verifiedCount, records, paidRecords, summary, withdrawals });
-  }
-
-  if (pathname === "/api/supplier-records/unverify-all" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can unverify sales records.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const selectedIds = Array.isArray(body.ids)
-      ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
-      : null;
-
-    const result = await unverifyAllSupplierRecords(selectedIds);
-    if (result.error) return sendJson(res, 400, { error: result.error });
-    incrementLedgerVersion();
-
-    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { unverifiedCount: result.unverifiedCount, records, paidRecords, summary, withdrawals });
-  }
-
-  if (pathname === "/api/supplier-records/mark-paid" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can mark supplier payments paid.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const selectedIds = Array.isArray(body.ids)
-      ? new Set(body.ids.map((id) => String(id || "").trim()).filter(Boolean))
-      : null;
-    const settleWithdrawals = body.settleWithdrawals !== false;
-
-    const result = await markSupplierRecordsPaid(selectedIds, session, { settleWithdrawals });
-    if (result.error) return sendJson(res, 400, { error: result.error });
-    incrementLedgerVersion();
-
-    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { paidCount: result.paidCount, paymentBatchId: result.paymentBatchId, records, paidRecords, summary, withdrawals });
-  }
-
-  if (pathname.startsWith("/api/supplier-payment-batches/") && pathname.endsWith("/reopen") && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can reopen supplier payments.");
-    if (!requireCsrf(req, res, session)) return;
-    const pathParts = pathname.split("/").filter(Boolean);
-    const paymentBatchId = decodeURIComponent(pathParts[2] || "");
-
-    const result = await reopenSupplierPaymentBatch(paymentBatchId, session);
-    if (result.error) return sendJson(res, 404, { error: result.error });
-    incrementLedgerVersion();
-
-    const { records, paidRecords, summary, withdrawals } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { reopenedCount: result.reopenedCount, records, paidRecords, summary, withdrawals });
-  }
-
-  if (pathname === "/api/supplier-withdrawals" && req.method === "GET") {
-    if (!canUseSupplier(session)) return notAllowed(res, "Only Discord admins can view supplier withdrawals.");
-    const payload = await getSupplierWithdrawalsPayload();
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/supplier-withdrawals" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can create supplier pre-withdrawals.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const charName = String(body.charName || "").trim();
-    const guild = String(body.guild || "").trim();
-    const amount = Number(body.amount);
-    const note = String(body.note || "").trim();
-    const date = String(body.date || new Date().toISOString().slice(0, 10)).trim();
-
-    if (!charName) return sendJson(res, 400, { error: "Character name is required." });
-    if (!guild) return sendJson(res, 400, { error: "Guild is required." });
-    if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Withdrawal amount must be greater than 0." });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
-
-    const withdrawal = {
-      id: `sw_${randomBytes(10).toString("base64url")}`,
-      date,
-      charName,
-      guild,
-      amount,
-      note,
-      settled: false,
-      settledAt: null,
-      settlementBatchId: null,
-      createdByDiscordId: session.discordId,
-      createdByName: session.username,
-      createdAt: new Date().toISOString()
-    };
-
-    await insertSupplierWithdrawal(withdrawal);
-    incrementLedgerVersion();
-    const { withdrawals } = await getSupplierWithdrawalsPayload();
-    return sendJson(res, 201, { withdrawal, withdrawals });
-  }
-
-  if (pathname.startsWith("/api/supplier-withdrawals/") && req.method === "PATCH") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can edit supplier pre-withdrawals.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const body = await readJson(req);
-    const existing = await getSupplierWithdrawalById(id);
-    if (!existing) return sendJson(res, 404, { error: "Withdrawal record not found." });
-
-    const updates = {};
-    if ("charName" in body) {
-      const charName = String(body.charName || "").trim();
-      if (!charName) return sendJson(res, 400, { error: "Character name is required." });
-      updates.charName = charName;
-    }
-    if ("guild" in body) {
-      const guild = String(body.guild || "").trim();
-      if (!guild) return sendJson(res, 400, { error: "Guild is required." });
-      updates.guild = guild;
-    }
-    if ("amount" in body) {
-      const amount = Number(body.amount);
-      if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Withdrawal amount must be greater than 0." });
-      updates.amount = amount;
-    }
-    if ("date" in body) {
-      const date = String(body.date || "").trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
-      updates.date = date;
-    }
-    if ("note" in body) updates.note = String(body.note || "").trim();
-
-    const updated = await updateSupplierWithdrawal(id, updates);
-    incrementLedgerVersion();
-    const { withdrawals } = await getSupplierWithdrawalsPayload();
-    return sendJson(res, 200, { withdrawal: updated, withdrawals });
-  }
-
-  if (pathname.startsWith("/api/supplier-withdrawals/") && req.method === "DELETE") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete supplier pre-withdrawals.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getSupplierWithdrawalById(id);
-    if (!existing) return sendJson(res, 404, { error: "Withdrawal record not found." });
-
-    await deleteSupplierWithdrawal(id);
-    incrementLedgerVersion();
-    const { withdrawals } = await getSupplierWithdrawalsPayload();
-    return sendJson(res, 200, { deletedId: id, withdrawals });
-  }
-
-  if (pathname.startsWith("/api/supplier-records/") && req.method === "PATCH") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update sales records.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const body = await readJson(req);
-
-    const updates = {};
-    if ("date" in body) {
-      const date = String(body.date || "").trim();
-      if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid sales record date." });
-      updates.date = date;
-    }
-    if ("buyerName" in body) {
-      const buyerName = String(body.buyerName || "").trim();
-      if (!buyerName) return sendJson(res, 400, { error: "Buyer character is required." });
-      updates.buyerName = buyerName;
-    }
-    if ("serviceType" in body) {
-      const serviceType = String(body.serviceType || "").trim();
-      const services = await getSupplierServicesList();
-      const serviceExists = services.some((service) => (typeof service === "object" ? service.type : service) === serviceType);
-      if (!serviceExists) return sendJson(res, 400, { error: "Choose a valid service for this sales record." });
-      updates.serviceType = serviceType;
-    }
-    if ("quantity" in body) {
-      const quantity = Number(body.quantity);
-      if (!Number.isFinite(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be greater than 0." });
-      updates.quantity = quantity;
-    }
-    if ("armorType" in body) {
-      const armorType = String(body.armorType || "").trim();
-      const armorTypes = await getArmorTypesList();
-      const armorExists = armorTypes.some((armor) => (typeof armor === "object" ? armor.name : armor) === armorType);
-      if (!armorExists) return sendJson(res, 400, { error: "Choose a valid armor stack." });
-      updates.armorType = armorType;
-    }
-    if ("rateAtRecord" in body) {
-      const rateAtRecord = Number(body.rateAtRecord);
-      if (!Number.isFinite(rateAtRecord) || rateAtRecord < 0) return sendJson(res, 400, { error: "Saved rate must be 0 or greater." });
-      updates.rateAtRecord = rateAtRecord;
-    }
-    if ("note" in body) updates.note = String(body.note || "").trim();
-    if ("correct" in body) updates.correct = Boolean(body.correct);
-    if ("paid" in body) {
-      const paid = Boolean(body.paid);
-      updates.paid = paid;
-      updates.paidAt = paid ? new Date().toISOString() : null;
-      updates.paidByDiscordId = paid ? session.discordId : null;
-      updates.paidByName = paid ? session.username : null;
-      updates.paymentBatchId = paid ? `spb_${randomBytes(12).toString("base64url")}` : null;
-    }
-
-    const updated = await updateSupplierRecord(id, updates);
-    if (!updated) return sendJson(res, 404, { error: "Sales record not found." });
-
-    incrementLedgerVersion();
-    const { summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { record: updated, summary });
-  }
-
-  if (pathname.startsWith("/api/supplier-records/") && req.method === "DELETE") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete sales records.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const record = await deleteSupplierRecord(id);
-    if (!record) return sendJson(res, 404, { error: "Sales record not found." });
-    incrementLedgerVersion();
-    const { summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { record, summary });
-  }
-
-  if (pathname === "/api/booster-records" && req.method === "GET") {
-    if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view payout rows.");
-    const payload = await getBoosterRecordsPayload(session, canManageAdmin(session));
-    const { adjustments } = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
-    const { vaultTransactions } = await getBoosterCashVaultPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, { ...payload, adjustments, vaultTransactions }, ledgerVersion);
-  }
-
-  if (pathname === "/api/booster-records" && req.method === "POST") {
-    if (!canUseBooster(session) || !session?.discordId) return sendJson(res, 403, { error: "Your Discord role cannot record booster payouts." });
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    if (!body.level || !body.quantity) return sendJson(res, 400, { error: "Mythic+ key level and run count are required." });
-    const quantity = Number(body.quantity);
-    if (!Number.isInteger(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Quantity must be a whole number greater than 0." });
-    if (!canManageAdmin(session) && quantity > 50) return sendJson(res, 400, { error: "Quantity cannot exceed 50 runs per entry." });
-    const level = String(body.level || "").trim();
-    const prices = await getBoosterPricesList();
-    if (!prices.some((price) => price.active !== false && price.level === level)) return sendJson(res, 400, { error: "Choose an active Mythic+ key level." });
-
-    const rateAtRecord = await getBoosterRate(level);
-    let boosterName = session.username;
-    let discordId = session.discordId;
-    let createdAt = new Date().toISOString();
-
-    if (canManageAdmin(session)) {
-      const customName = String(body.boosterName || "").trim();
-      if (customName) {
-        boosterName = customName;
-        if (customName !== session.username) {
-          const { records } = await getBoosterRecordsPayload(session, true);
-          const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-          const matched = records.find((r) => r.boosterName === customName && r.discordId && !r.discordId.startsWith("outsourced"))
-            || adjustments.find((a) => a.boosterName === customName && a.discordId && !a.discordId.startsWith("outsourced"));
-          discordId = matched?.discordId || (body.discordId ? String(body.discordId).trim() : `outsourced:${customName}`);
-        }
-      }
-      const rawDate = String(body.date || body.createdAt || "").trim();
-      if (rawDate) {
-        const isDateOnly = validIsoDate(rawDate);
-        const isParsable = !Number.isNaN(Date.parse(rawDate));
-        if (!isDateOnly && !isParsable) {
-          return sendJson(res, 400, { error: "Choose a valid payout date." });
-        }
-        createdAt = isDateOnly ? `${rawDate}T00:00:00.000Z` : new Date(rawDate).toISOString();
-      }
-    }
-
-    const record = {
-      id: randomBytes(10).toString("base64url"),
-      discordId,
-      boosterName,
-      level,
-      quantity,
-      note: String(body.note || "").trim(),
-      paid: false,
-      rateAtRecord,
-      totalBalance: lineTotal(rateAtRecord, quantity),
-      createdAt
-    };
-
-    await insertBoosterRecord(record);
-    incrementLedgerVersion();
-    return sendJson(res, 201, { record });
-  }
-
-  if (pathname === "/api/booster-records/mark-paid" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can mark booster payouts paid.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const selectedIds = new Set(
-      (Array.isArray(body.ids) ? body.ids : []).map((id) => String(id || "").trim()).filter(Boolean)
-    );
-    if (!selectedIds.size) return sendJson(res, 400, { error: "Select at least one open booster payout row." });
-
-    const result = await markBoosterRecordsPaid(selectedIds, session);
-    if (result.error) return sendJson(res, 400, { error: result.error });
-    incrementLedgerVersion();
-
-    const { records, summary } = await getBoosterRecordsPayload(session, true);
-    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-    return sendJson(res, 200, {
-      paidCount: result.paidCount,
-      boosterPaymentBatchId: result.boosterPaymentBatchId,
-      records,
-      summary,
-      adjustments
-    });
-  }
-
-  if (pathname === "/api/booster-records/settle" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can settle booster payouts.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const discordId = String(body.discordId || "").trim();
-    const boosterName = String(body.boosterName || "").trim();
-    const rate = Number(body.rate) || 0;
-    const action = body.action === "hold_cash" ? "hold_cash" : "pay_now";
-    const date = String(body.date || "").trim();
-    const note = String(body.note || "").trim();
-
-    if (!discordId && !boosterName) {
-      return sendJson(res, 400, { error: "Booster name or ID is required for settlement." });
-    }
-
-    const result = await settleBoosterBalance({ discordId, boosterName }, session, { rate, action, date, note });
-    if (result.error) return sendJson(res, 400, { error: result.error });
-    incrementLedgerVersion();
-
-    const { records, summary } = await getBoosterRecordsPayload(session, true);
-    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-    const { vaultTransactions } = await getBoosterCashVaultPayload(session, true);
-    return sendJson(res, 200, {
-      settledCount: result.settledCount,
-      netPayoutAmount: result.netPayoutAmount,
-      rate: result.rate,
-      cashAmountMmk: result.cashAmountMmk,
-      action: result.action,
-      vaultTransaction: result.vaultTransaction,
-      boosterPaymentBatchId: result.boosterPaymentBatchId,
-      records,
-      summary,
-      adjustments,
-      vaultTransactions
-    });
-  }
-
-  if (pathname === "/api/booster-cash-vault" && req.method === "GET") {
-    if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view vault records.");
-    const payload = await getBoosterCashVaultPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/booster-cash-vault/withdraw" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can release stored cash to boosters.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const result = await withdrawBoosterVaultCash(body, session);
-    if (result.error) return sendJson(res, 400, { error: result.error });
-    incrementLedgerVersion();
-
-    const { vaultTransactions } = await getBoosterCashVaultPayload(session, true);
-    return sendJson(res, 200, { ...result, vaultTransactions });
-  }
-
-  if (pathname.startsWith("/api/booster-records/") && req.method === "PATCH") {
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const body = await readJson(req);
-    const record = await getBoosterRecordById(id);
-    if (!record) return sendJson(res, 404, { error: "Payout row not found." });
-    if (!canEditBoosterRecord(session, record)) return notAllowed(res, "Boosters can only edit their own payout rows.");
-
-    const updates = {};
-    if ("paid" in body) {
-      if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can mark booster payouts paid.");
-      const paid = Boolean(body.paid);
-      updates.paid = paid;
-      updates.paidAt = paid ? new Date().toISOString() : null;
-      updates.paidByDiscordId = paid ? session.discordId : null;
-      updates.paidByName = paid ? session.username : null;
-      updates.boosterPaymentBatchId = paid ? `bpb_${randomBytes(12).toString("base64url")}` : null;
-    }
-    if ("boosterName" in body) {
-      if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change the booster name.");
-      const newBoosterName = String(body.boosterName || "").trim();
-      if (!newBoosterName) return sendJson(res, 400, { error: "Booster name cannot be empty." });
-      updates.boosterName = newBoosterName;
-      if (newBoosterName !== record.boosterName) {
-        const { records } = await getBoosterRecordsPayload(session, true);
-        const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-        const matched = records.find((r) => r.boosterName === newBoosterName && r.discordId && !r.discordId.startsWith("outsourced"))
-          || adjustments.find((a) => a.boosterName === newBoosterName && a.discordId && !a.discordId.startsWith("outsourced"));
-        updates.discordId = matched?.discordId || `outsourced:${newBoosterName}`;
-      }
-    }
-    if ("level" in body) {
-      const level = String(body.level || "").trim();
-      const prices = await getBoosterPricesList();
-      const levelExists = prices.some((price) => price.active !== false && price.level === level);
-      if (!levelExists && level !== record.level) return sendJson(res, 400, { error: "Choose a valid Mythic+ key level." });
-      updates.level = level;
-      if (level !== record.level && !("rateAtRecord" in body)) {
-        updates.rateAtRecord = await getBoosterRate(level);
-      }
-    }
-    if ("quantity" in body) {
-      const quantity = Number(body.quantity);
-      if (!Number.isInteger(quantity) || quantity <= 0) return sendJson(res, 400, { error: "Runs completed must be a whole number greater than 0." });
-      if (!canManageAdmin(session) && quantity > 50) return sendJson(res, 400, { error: "Quantity cannot exceed 50 runs per entry." });
-      updates.quantity = quantity;
-    }
-    if ("createdAt" in body) {
-      const createdAt = String(body.createdAt || "").trim();
-      const isDateOnly = validIsoDate(createdAt);
-      const isParsable = !Number.isNaN(Date.parse(createdAt));
-      if (!createdAt || (!isDateOnly && !isParsable)) {
-        return sendJson(res, 400, { error: "Choose a valid payout date." });
-      }
-      updates.createdAt = isDateOnly ? `${createdAt}T00:00:00.000Z` : new Date(createdAt).toISOString();
-    }
-    if ("rateAtRecord" in body) {
-      if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change saved payout rates.");
-      const rateAtRecord = Number(body.rateAtRecord);
-      if (!Number.isFinite(rateAtRecord) || rateAtRecord < 0) return sendJson(res, 400, { error: "Saved payout rate must be 0 or greater." });
-      updates.rateAtRecord = rateAtRecord;
-    }
-    if ("note" in body) updates.note = String(body.note || "").trim();
-
-    const updated = await updateBoosterRecord(id, updates);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { record: updated });
-  }
-
-  if (pathname.startsWith("/api/booster-records/") && req.method === "DELETE") {
-    if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to delete payout rows.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const record = await getBoosterRecordById(id);
-    if (!record) return sendJson(res, 404, { error: "Payout row not found." });
-    if (!canDeleteBoosterRecord(session, record)) return notAllowed(res, "Boosters can only delete their own payout rows.");
-    await deleteBoosterRecord(id);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { record });
-  }
-
-  if (pathname === "/api/booster-adjustments" && req.method === "GET") {
-    if (!canUseBooster(session)) return notAllowed(res, "Sign in with a Discord admin or booster role to view adjustments.");
-    const payload = await getBoosterAdjustmentsPayload(session, canManageAdmin(session));
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/booster-adjustments" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can create booster balance adjustments.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const boosterName = String(body.boosterName || "").trim();
-    const discordId = String(body.discordId || "").trim();
-    const type = String(body.type || "").trim();
-    const amount = Number(body.amount);
-    const note = String(body.note || "").trim();
-    const date = String(body.date || new Date().toISOString().slice(0, 10)).trim();
-
-    if (!boosterName) return sendJson(res, 400, { error: "Booster name is required." });
-    if (type !== "add" && type !== "deduct") return sendJson(res, 400, { error: "Adjustment type must be 'add' or 'deduct'." });
-    if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Adjustment amount must be greater than 0." });
-    if (!note) return sendJson(res, 400, { error: "Reason / note is required for balance adjustments." });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
-
-    const adjustment = {
-      id: `badj_${randomBytes(10).toString("base64url")}`,
-      discordId,
-      boosterName,
-      type,
-      amount,
-      note,
-      date,
-      createdAt: new Date().toISOString(),
-      createdByDiscordId: session.discordId,
-      createdByName: session.username
-    };
-
-    await insertBoosterAdjustment(adjustment);
-    incrementLedgerVersion();
-    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-    return sendJson(res, 201, { adjustment, adjustments });
-  }
-
-  if (pathname.startsWith("/api/booster-adjustments/") && req.method === "PATCH") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can edit booster balance adjustments.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const body = await readJson(req);
-    const existing = await getBoosterAdjustmentById(id);
-    if (!existing) return sendJson(res, 404, { error: "Adjustment not found." });
-
-    const updates = {};
-    if ("amount" in body) {
-      const amount = Number(body.amount);
-      if (isNaN(amount) || amount <= 0) return sendJson(res, 400, { error: "Adjustment amount must be greater than 0." });
-      updates.amount = amount;
-    }
-    if ("note" in body) {
-      const note = String(body.note || "").trim();
-      if (!note) return sendJson(res, 400, { error: "Reason / note is required." });
-      updates.note = note;
-    }
-    if ("date" in body) {
-      const date = String(body.date || "").trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: "Date must be in YYYY-MM-DD format." });
-      updates.date = date;
-    }
-    if ("type" in body) {
-      const type = String(body.type || "").trim();
-      if (type !== "add" && type !== "deduct") return sendJson(res, 400, { error: "Type must be 'add' or 'deduct'." });
-      updates.type = type;
-    }
-
-    const updated = await updateBoosterAdjustment(id, updates);
-    incrementLedgerVersion();
-    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-    return sendJson(res, 200, { adjustment: updated, adjustments });
-  }
-
-  if (pathname.startsWith("/api/booster-adjustments/") && req.method === "DELETE") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete booster balance adjustments.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getBoosterAdjustmentById(id);
-    if (!existing) return sendJson(res, 404, { error: "Adjustment not found." });
-
-    await deleteBoosterAdjustment(id);
-    incrementLedgerVersion();
-    const { adjustments } = await getBoosterAdjustmentsPayload(session, true);
-    return sendJson(res, 200, { deletedId: id, adjustments });
-  }
-
-  if (pathname === "/api/prices/supplier" && req.method === "PUT") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change rates.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const cleaned = cleanPriceRows(body.rows, "type");
-    const supplierServices = await updateSupplierServices(cleaned);
-    incrementLedgerVersion();
-    const { summary } = await getSupplierRecordsPayload();
-    return sendJson(res, 200, { supplierServices, summary });
-  }
-
-  if (pathname === "/api/prices/booster" && req.method === "PUT") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change rates.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const cleaned = cleanPriceRows(body.rows, "level");
-    const boosterPrices = await updateBoosterPrices(cleaned);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { boosterPrices });
-  }
-
-  if (pathname === "/api/prices/supplier-guilds" && req.method === "PUT") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change supplier guilds.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const cleaned = cleanGuildRows(body.rows);
-    const supplierGuilds = await updateSupplierGuilds(cleaned);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { supplierGuilds });
-  }
-
-  if (pathname === "/api/prices/raid-titles" && req.method === "PUT") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change raid note titles.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const cleaned = cleanRaidTitleRows(body.rows);
-    const raidNoteTitles = await updateRaidNoteTitles(cleaned);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { raidNoteTitles });
-  }
-
-  if (pathname === "/api/prices/buyer-purchase-types" && req.method === "PUT") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change purchase types.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const cleaned = cleanPurchaseTypeRows(body.rows);
-    const buyerPurchaseTypes = await updateBuyerPurchaseTypes(cleaned);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { buyerPurchaseTypes });
-  }
-
-  if (pathname === "/api/prices/armor-types" && req.method === "PUT") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can change armor stack options.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const cleaned = cleanArmorRows(body.rows);
-    const armorTypes = await updateArmorTypes(cleaned);
-    incrementLedgerVersion();
-    return sendJson(res, 200, { armorTypes });
-  }
-
-  if (pathname === "/api/external-expenses" && req.method === "GET") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view external expenses.");
-    const payload = await getExternalExpensesPayload();
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/external-expenses" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can record external expenses.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return sendJson(res, 400, { error: "Amount must be a positive number." });
-    }
-    const title = String(body.title || "").trim();
-    if (!title) {
-      return sendJson(res, 400, { error: "Expense description or title is required." });
-    }
-    const category = String(body.category || "Raid payment").trim();
-    const date = String(body.date || "").trim() || new Date().toISOString().slice(0, 10);
-    if (!validIsoDate(date)) {
-      return sendJson(res, 400, { error: "Choose a valid expense date." });
-    }
-    const recipient = String(body.recipient || "").trim();
-    const note = String(body.note || "").trim();
-
-    const record = await insertExternalExpense({
-      date,
-      category,
-      title,
-      amount,
-      recipient,
-      note
-    }, session);
-    incrementLedgerVersion();
-    const payload = await getExternalExpensesPayload();
-    return sendJson(res, 200, { expense: record, ...payload });
-  }
-
-  if (pathname.startsWith("/api/external-expenses/") && req.method === "PATCH") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update external expenses.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getExternalExpenseById(id);
-    if (!existing) return sendJson(res, 404, { error: "Expense not found." });
-
-    const body = await readJson(req);
-    const updates = {};
-    if ("amount" in body) {
-      const amount = Number(body.amount);
-      if (!Number.isFinite(amount) || amount <= 0) return sendJson(res, 400, { error: "Amount must be a positive number." });
-      updates.amount = amount;
-    }
-    if ("title" in body) {
-      const title = String(body.title || "").trim();
-      if (!title) return sendJson(res, 400, { error: "Expense description cannot be empty." });
-      updates.title = title;
-    }
-    if ("category" in body) {
-      const category = String(body.category || "").trim();
-      if (!category) return sendJson(res, 400, { error: "Category cannot be empty." });
-      updates.category = category;
-    }
-    if ("date" in body) {
-      const date = String(body.date || "").trim();
-      if (!validIsoDate(date)) return sendJson(res, 400, { error: "Choose a valid expense date." });
-      updates.date = date;
-    }
-    if ("recipient" in body) {
-      updates.recipient = String(body.recipient || "").trim();
-    }
-    if ("note" in body) {
-      updates.note = String(body.note || "").trim();
-    }
-
-    const updated = await updateExternalExpense(id, updates);
-    incrementLedgerVersion();
-    const payload = await getExternalExpensesPayload();
-    return sendJson(res, 200, { expense: updated, ...payload });
-  }
-
-  if (pathname.startsWith("/api/external-expenses/") && req.method === "DELETE") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete external expenses.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getExternalExpenseById(id);
-    if (!existing) return sendJson(res, 404, { error: "Expense not found." });
-
-    await deleteExternalExpense(id);
-    incrementLedgerVersion();
-    const payload = await getExternalExpensesPayload();
-    return sendJson(res, 200, { deletedId: id, ...payload });
-  }
-
-  if (pathname === "/api/raid-notes" && req.method === "GET") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can view raid notes.");
-    const payload = await getRaidNotesPayload();
-    return sendJson(res, 200, payload, ledgerVersion);
-  }
-
-  if (pathname === "/api/raid-notes" && req.method === "POST") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can create raid notes.");
-    if (!requireCsrf(req, res, session)) return;
-    const body = await readJson(req);
-    const title = String(body.title || "").trim();
-    if (!title) return sendJson(res, 400, { error: "Raid note title is required." });
-    const raidDate = String(body.raidDate || "").trim() || new Date().toISOString().slice(0, 10);
-    if (!validIsoDate(raidDate)) return sendJson(res, 400, { error: "Choose a valid raid date." });
-    const raidTime = String(body.raidTime || "").trim();
-    const color = String(body.color || "default").trim();
-    const pinned = Boolean(body.pinned);
-    const items = Array.isArray(body.items) ? body.items : [];
-
-    const record = await insertRaidNote({
-      title,
-      raidDate,
-      raidTime,
-      color,
-      pinned,
-      items
-    }, session);
-    incrementLedgerVersion();
-    const payload = await getRaidNotesPayload();
-    return sendJson(res, 201, { note: record, ...payload });
-  }
-
-  if (pathname.startsWith("/api/raid-notes/") && req.method === "PATCH") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can update raid notes.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getRaidNoteById(id);
-    if (!existing) return sendJson(res, 404, { error: "Raid note not found." });
-
-    const body = await readJson(req);
-    const updates = {};
-    if ("title" in body) {
-      const title = String(body.title || "").trim();
-      if (!title) return sendJson(res, 400, { error: "Raid note title cannot be empty." });
-      updates.title = title;
-    }
-    if ("raidDate" in body) {
-      const raidDate = String(body.raidDate || "").trim();
-      if (!validIsoDate(raidDate)) return sendJson(res, 400, { error: "Choose a valid raid date." });
-      updates.raidDate = raidDate;
-    }
-    if ("raidTime" in body) updates.raidTime = String(body.raidTime || "").trim();
-    if ("color" in body) updates.color = String(body.color || "default").trim();
-    if ("pinned" in body) updates.pinned = Boolean(body.pinned);
-    if ("archived" in body) updates.archived = Boolean(body.archived);
-    if ("items" in body && Array.isArray(body.items)) updates.items = body.items;
-
-    const updated = await updateRaidNote(id, updates);
-    incrementLedgerVersion();
-    const payload = await getRaidNotesPayload();
-    return sendJson(res, 200, { note: updated, ...payload });
-  }
-
-  if (pathname.startsWith("/api/raid-notes/") && req.method === "DELETE") {
-    if (!canManageAdmin(session)) return notAllowed(res, "Only Discord admins can delete raid notes.");
-    if (!requireCsrf(req, res, session)) return;
-    const id = pathname.split("/").pop();
-    const existing = await getRaidNoteById(id);
-    if (!existing) return sendJson(res, 404, { error: "Raid note not found." });
-
-    await deleteRaidNote(id);
-    incrementLedgerVersion();
-    const payload = await getRaidNotesPayload();
-    return sendJson(res, 200, { deletedId: id, ...payload });
+  // Route handlers live in lib/server/routes/<domain>.js.
+  const context = { req, res, url, pathname, searchParams, session };
+  for (const route of apiRoutes) {
+    if (!route.match(context)) continue;
+    await route.handler(context);
+    if (res.writableEnded) return;
   }
 
   sendJson(res, 404, { error: "Not found." });
-}
-
-function cleanArmorRows(rows) {
-  if (!Array.isArray(rows) || !rows.length) {
-    throw Object.assign(new Error("Keep at least one armor stack option. Archive options that should no longer be used."), { statusCode: 400 });
-  }
-  const cleaned = rows.map((row) => ({
-    name: String(row.name || "").trim(),
-    active: row.active !== false,
-    isDefault: Boolean(row.isDefault)
-  }));
-  if (cleaned.some((row) => !row.name)) {
-    throw Object.assign(new Error("Every armor stack option needs a name."), { statusCode: 400 });
-  }
-  const seen = new Set();
-  for (const row of cleaned) {
-    const normalizedName = row.name.toLocaleLowerCase();
-    if (seen.has(normalizedName)) {
-      throw Object.assign(new Error("Duplicate armor stack option names are not allowed."), { statusCode: 400 });
-    }
-    seen.add(normalizedName);
-  }
-  return cleaned;
-}
-
-function cleanGuildRows(rows) {
-  if (!Array.isArray(rows) || !rows.length) {
-    throw Object.assign(new Error("Keep at least one guild. Archive guilds that should no longer be used."), { statusCode: 400 });
-  }
-  const cleaned = rows.map((row) => ({
-    name: String(row.name || "").trim(),
-    active: row.active !== false,
-    isDefault: Boolean(row.isDefault)
-  }));
-  if (cleaned.some((row) => !row.name)) {
-    throw Object.assign(new Error("Every guild needs a name."), { statusCode: 400 });
-  }
-  const seen = new Set();
-  for (const row of cleaned) {
-    const normalizedName = row.name.toLocaleLowerCase();
-    if (seen.has(normalizedName)) {
-      throw Object.assign(new Error("Duplicate guild names are not allowed."), { statusCode: 400 });
-    }
-    seen.add(normalizedName);
-  }
-  return cleaned;
-}
-
-function cleanRaidTitleRows(rows) {
-  if (!Array.isArray(rows) || !rows.length) {
-    throw Object.assign(new Error("Keep at least one raid note title. Archive titles that should no longer be used."), { statusCode: 400 });
-  }
-  const cleaned = rows.map((row) => ({
-    name: String(row.name || "").trim(),
-    active: row.active !== false,
-    isDefault: Boolean(row.isDefault)
-  }));
-  if (cleaned.some((row) => !row.name)) {
-    throw Object.assign(new Error("Every raid note title needs a name."), { statusCode: 400 });
-  }
-  const seen = new Set();
-  for (const row of cleaned) {
-    const normalizedName = row.name.toLocaleLowerCase();
-    if (seen.has(normalizedName)) {
-      throw Object.assign(new Error("Duplicate raid note titles are not allowed."), { statusCode: 400 });
-    }
-    seen.add(normalizedName);
-  }
-  return cleaned;
-}
-
-function cleanPurchaseTypeRows(rows) {
-  if (!Array.isArray(rows) || !rows.length) {
-    throw Object.assign(new Error("Keep at least one purchase type. Archive types that should no longer be used."), { statusCode: 400 });
-  }
-  const cleaned = rows.map((row) => ({
-    name: String(row.name || "").trim(),
-    active: row.active !== false,
-    isDefault: Boolean(row.isDefault)
-  }));
-  if (cleaned.some((row) => !row.name)) {
-    throw Object.assign(new Error("Every purchase type needs a name."), { statusCode: 400 });
-  }
-  const seen = new Set();
-  for (const row of cleaned) {
-    const normalizedName = row.name.toLocaleLowerCase();
-    if (seen.has(normalizedName)) {
-      throw Object.assign(new Error("Duplicate purchase types are not allowed."), { statusCode: 400 });
-    }
-    seen.add(normalizedName);
-  }
-  return cleaned;
-}
-
-function cleanPriceRows(rows, key) {
-  if (!Array.isArray(rows) || !rows.length) {
-    throw Object.assign(new Error("Keep at least one rate row. Archive rates that should no longer be used."), { statusCode: 400 });
-  }
-  const cleaned = rows
-    .map((row) => ({
-      [key]: String(row[key] || "").trim(),
-      price: Number(row.price),
-      active: row.active !== false,
-      isDefault: Boolean(row.isDefault)
-    }));
-  if (cleaned.some((row) => !row[key] || !Number.isFinite(row.price) || row.price < 0)) {
-    throw Object.assign(new Error("Every rate needs a name and a value of 0 or greater."), { statusCode: 400 });
-  }
-  const seen = new Set();
-  for (const row of cleaned) {
-    const normalizedName = row[key].toLocaleLowerCase();
-    if (seen.has(normalizedName)) {
-      throw Object.assign(new Error(`Duplicate ${key === "type" ? "service" : "key level"} names are not allowed.`), { statusCode: 400 });
-    }
-    seen.add(normalizedName);
-  }
-  return cleaned;
 }
 
 async function handleDiscord(req, res, url) {
@@ -1421,6 +181,11 @@ async function handleDiscord(req, res, url) {
       if (!role) return redirectWithAuthError(res, "Your Discord account does not have an allowed admin or booster role.");
 
       await setSession(res, { role, discordId: user.id, username: user.global_name || user.username });
+      try {
+        await recordUserLogin({ discordId: user.id, username: user.global_name || user.username, role });
+      } catch (error) {
+        console.error("[USERS] Could not update the users directory:", error.message);
+      }
       res.writeHead(302, { Location: "/" });
       return res.end();
     } catch (error) {
@@ -1444,7 +209,7 @@ function redirectWithAuthError(res, message) {
   res.end();
 }
 
-function serveStatic(res, pathname) {
+function serveStatic(req, res, pathname) {
   const file = pathname === "/" ? "index.html" : pathname.slice(1);
   const target = resolve(existsSync(distDir) ? distDir : publicDir, file);
   const fallbackTarget = resolve(publicDir, file);
@@ -1452,9 +217,28 @@ function serveStatic(res, pathname) {
   const resolvedTarget = existsSync(target) ? target : fallbackTarget;
   if (!resolvedTarget.startsWith(staticRoot) && !resolvedTarget.startsWith(publicDir)) return sendJson(res, 400, { error: "Bad path." });
   if (!existsSync(resolvedTarget)) return sendJson(res, 404, { error: "Not found." });
+  const stats = statSync(resolvedTarget);
+  if (!stats.isFile()) return sendJson(res, 404, { error: "Not found." });
+  const etag = `W/"${stats.size.toString(36)}-${Math.floor(stats.mtimeMs).toString(36)}"`;
   setSecurityHeaders(res);
-  res.writeHead(200, { "Content-Type": mimeTypes[extname(resolvedTarget)] || "application/octet-stream" });
+  res.setHeader("ETag", etag);
+  res.setHeader("Last-Modified", stats.mtime.toUTCString());
+  res.setHeader("Cache-Control", cacheControlFor(pathname));
+  if (req.headers["if-none-match"] === etag) {
+    res.writeHead(304);
+    return res.end();
+  }
+  res.writeHead(200, { "Content-Type": mimeTypes[extname(resolvedTarget).toLowerCase()] || "application/octet-stream" });
+  if (req.method === "HEAD") return res.end();
   res.end(readFileSync(resolvedTarget));
+}
+
+// Vite puts content-hashed files in /assets/, so they can be cached forever.
+// Everything else (index.html, styles.css, images in public/) keeps the same name
+// across deploys, so browsers must revalidate it (cheap 304 thanks to the ETag).
+function cacheControlFor(pathname) {
+  if (pathname.startsWith("/assets/")) return "public, max-age=31536000, immutable";
+  return "no-cache";
 }
 
 const vite = useViteDevServer ? await createViteMiddleware() : null;
@@ -1491,10 +275,10 @@ const server = createServer(async (req, res) => {
           console.error(error);
           return sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "Something went wrong." });
         }
-        if (!res.writableEnded) return serveStatic(res, url.pathname);
+        if (!res.writableEnded) return serveStatic(req, res, url.pathname);
       });
     }
-    return serveStatic(res, url.pathname);
+    return serveStatic(req, res, url.pathname);
   } catch (error) {
     vite?.ssrFixStacktrace(error);
     console.error(error);
@@ -1518,3 +302,5 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 export { server };
+export { incrementLedgerVersion } from "./lib/server/ledgerVersion.js";
+export { currentLedgerTag } from "./lib/server/ledgerVersion.js";

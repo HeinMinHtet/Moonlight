@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Calendar, Download, FileImage, Sparkles, X } from "lucide-react";
-import { money } from "../../utils/format.js";
+import { addDaysIso, money, monthStartIso, today } from "../../utils/format.js";
 import { buildSupplierSummary } from "../../utils/supplierBatch.js";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -115,20 +115,16 @@ export function SupplierExportDialog({
   };
 
   const handleSetQuickRange = (type) => {
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
+    const todayStr = today();
 
     if (type === "today") {
       setDateFrom(todayStr);
       setDateTo(todayStr);
     } else if (type === "week") {
-      const start = new Date(now);
-      start.setDate(start.getDate() - 6);
-      setDateFrom(start.toISOString().slice(0, 10));
+      setDateFrom(addDaysIso(todayStr, -6));
       setDateTo(todayStr);
     } else if (type === "month") {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      setDateFrom(start.toISOString().slice(0, 10));
+      setDateFrom(monthStartIso(todayStr));
       setDateTo(todayStr);
     } else if (type === "all") {
       setDateFrom("");

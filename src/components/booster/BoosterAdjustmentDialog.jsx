@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { money } from "../../utils/format.js";
+import { money, today } from "../../utils/format.js";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
@@ -19,7 +19,7 @@ export function BoosterAdjustmentDialog({
   const [type, setType] = useState(() => initialData?.type || "add"); // "add" | "deduct"
   const [amount, setAmount] = useState(() => (initialData?.amount != null ? String(initialData.amount) : ""));
   const [note, setNote] = useState(() => initialData?.note || "");
-  const [date, setDate] = useState(() => initialData?.date || new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => initialData?.date || today());
   const [error, setError] = useState("");
 
   const prevIsOpenRef = useRef(isOpen);
@@ -36,14 +36,14 @@ export function BoosterAdjustmentDialog({
         setType(initialData.type || "add");
         setAmount(initialData.amount != null ? String(initialData.amount) : "");
         setNote(initialData.note || "");
-        setDate(initialData.date || new Date().toISOString().slice(0, 10));
+        setDate(initialData.date || today());
       } else {
         setBoosterName(boosters[0]?.boosterName || "");
         setDiscordId(boosters[0]?.discordId || "");
         setType("add");
         setAmount("");
         setNote("");
-        setDate(new Date().toISOString().slice(0, 10));
+        setDate(today());
       }
       setError("");
     }

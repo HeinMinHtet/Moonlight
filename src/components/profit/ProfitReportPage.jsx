@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../api.js";
-import { dateOnly, getWeekEnd, getWeekStart, money, today } from "../../utils/format.js";
+import { addDaysIso, dateOnly, getWeekEnd, getWeekStart, money, today } from "../../utils/format.js";
 import { AccessDenied } from "../AccessDenied.jsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
@@ -17,10 +17,8 @@ const currentDate = today();
 const currentMonth = currentDate.slice(0, 7);
 
 function getDefaultWeeklyRange() {
-  const now = new Date();
-  const todayIso = now.toISOString().slice(0, 10);
-  const past = new Date(now.getTime() - 42 * 24 * 60 * 60 * 1000);
-  const pastIso = past.toISOString().slice(0, 10);
+  const todayIso = today();
+  const pastIso = addDaysIso(todayIso, -42);
   return {
     from: getWeekStart(pastIso) || pastIso,
     to: getWeekEnd(todayIso) || todayIso

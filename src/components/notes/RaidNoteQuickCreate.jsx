@@ -1,3 +1,4 @@
+import { today } from "../../utils/format.js";
 import React, { useState, useRef } from "react";
 import { Plus, Pin, PinOff, Palette, Check, X, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button.jsx";
@@ -20,7 +21,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], buyerPu
   const defaultPurchaseType = buyerPurchaseTypes.find((s) => s.isDefault && s.active !== false)?.name || (buyerPurchaseTypes.filter(s => s.active !== false)[0]?.name || "");
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState(defaultTitle);
-  const [raidDate, setRaidDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [raidDate, setRaidDate] = useState(() => today());
   const [raidTime, setRaidTime] = useState("");
   const [color, setColor] = useState("default");
   const [pinned, setPinned] = useState(false);
@@ -73,7 +74,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], buyerPu
 
   const handleReset = () => {
     setTitle(defaultTitle);
-    setRaidDate(new Date().toISOString().slice(0, 10));
+    setRaidDate(today());
     setRaidTime("");
     setColor("default");
     setPinned(false);
@@ -99,7 +100,7 @@ export function RaidNoteQuickCreate({ onCreateNote, raidNoteTitles = [], buyerPu
     try {
       await onCreateNote({
         title: cleanTitle,
-        raidDate: raidDate || new Date().toISOString().slice(0, 10),
+        raidDate: raidDate || today(),
         raidTime: raidTime.trim(),
         color,
         pinned,

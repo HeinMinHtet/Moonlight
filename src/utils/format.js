@@ -1,6 +1,11 @@
+import { bangkokToday } from "../../lib/bangkokDate.js";
+
+export { addDaysIso, monthStartIso } from "../../lib/bangkokDate.js";
+
 export const THAILAND_TIMEZONE = "Asia/Bangkok";
 
-export const today = () => new Date().toISOString().slice(0, 10);
+// Today on a Bangkok calendar (not the UTC date).
+export const today = () => bangkokToday();
 
 export const money = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 

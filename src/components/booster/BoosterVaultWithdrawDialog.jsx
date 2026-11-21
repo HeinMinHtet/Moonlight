@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Banknote, CheckCircle2 } from "lucide-react";
-import { mmk } from "../../utils/format.js";
+import { mmk, today } from "../../utils/format.js";
 import { validateVaultWithdrawalPayload } from "../../utils/boosterBalance.js";
 import { Alert, AlertDescription } from "@/components/ui/alert.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
@@ -20,7 +20,7 @@ export function BoosterVaultWithdrawDialog({
 
   const [amount, setAmount] = useState(() => String(currentBalance > 0 ? currentBalance : ""));
   const [paymentMethod, setPaymentMethod] = useState("KBZPay");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => today());
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

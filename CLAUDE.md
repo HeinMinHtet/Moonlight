@@ -42,12 +42,26 @@ Copy `.env.example` to `.env`. Without the Discord variables, login does not wor
 ## Layout
 
 ```
-server.js                 Whole HTTP gateway (~1.7k lines): env loading, rate limiting, signed
-                          session cookie + CSRF, permissions, every /api/* route (handleApi),
-                          Discord OAuth (handleDiscord), static/Vite serving, input cleaners
-                          (cleanPriceRows, cleanArmorRows, ...). Exports `server` for tests.
-lib/db.js                 Data access layer (~3.3k lines). Every exported function has BOTH a
-                          Postgres branch and a JSON-file branch. Schema + seeds in initDb().
+server.js                 HTTP entry point (~300 lines): rate limiting, the /api dispatcher (handleApi),
+                          Discord OAuth (handleDiscord), static/Vite serving. Exports `server` for tests.
+lib/server/config.js      Loads .env (skipped under tests), reads all env config, refuses to start in
+                          production with a default SESSION_SECRET. Imported first by server.js.
+lib/server/auth.js        Signed session cookie, sessions, permissions (can*, permissionsFor), requireCsrf.
+lib/server/http.js        readJson, sendJson, setSecurityHeaders, notAllowed.
+lib/server/ledgerVersion.js  incrementLedgerVersion / currentLedgerTag (boot id + counter, used as ETag
+                          and by GET /api/ledger-version for the UI's cheap change check).
+lib/server/cleaners.js    Input cleaners for rate lists (cleanPriceRows, cleanNamedOptionRows, ...).
+lib/server/routes/        One file per domain (supplier, booster, rates, expenses, raidNotes, profit,
+                          session). Each exports an array of { match, handler }; routes/index.js
+                          joins them into apiRoutes in order.
+lib/db.js                 Public data-access API: re-exports everything from lib/db/. Import from here.
+lib/db/                   Data access split by domain (supplierRecords, supplierWithdrawals, boosterRecords,
+                          boosterAdjustments, boosterVault, rates, expenses, raidNotes, sessions, profit).
+                          core.js = pool, JSON-file storage (atomic writes), mappers, shared helpers.
+                          schema.js = initDb(): baseline schema + seeds, then runs lib/migrations.js.
+                          Every exported function has BOTH a Postgres branch and a JSON-file branch.
+lib/migrations.js         Versioned, additive Postgres migrations (schema_migrations table).
+lib/bangkokDate.js        bangkokToday(), addDaysIso(), monthStartIso(): use for any default "today".
 lib/profitReport.js       Pure profit aggregation (buildProfitReport, validIsoDate).
 src/main.jsx → App.jsx    App.jsx holds global state, the active tab, config/permissions and
                           data loading per tab; renders the page components.
@@ -63,6 +77,7 @@ src/utils/                Pure frontend business logic (booster balances/settlem
                           supplier batch summary, withdrawals reconciliation, price calculator,
                           supplier PNG/SVG report export, formatting).
 test/                     Node tests. Many import ../server.js and hit a real listening server.
+                          test/setup.js (loaded by `npm test`) isolates every run from real data.
 data/                     database.json (gitignored, may hold real data). database.example.json is a sample.
 public/                   styles.css (imported into Tailwind as the `legacy` layer, still in use),
                           avatar, and an OLD vanilla-JS app (app.js/index.html). Only served when dist/ is missing.
@@ -96,18 +111,20 @@ A new privileged route needs both a server-side permission check and `requireCsr
 ## Patterns to follow
 
 **Adding or changing an API route**
-1. Add the branch in `handleApi` in `server.js`. Routes are matched with `pathname === ...` / `startsWith` plus `req.method`. Read the body with `readJson(req)` and reply with `sendJson(res, status, payload)`. Use `notAllowed(res)` for 403.
+1. Add a `{ match, handler }` entry to the domain file in `lib/server/routes/` (or a new file, added to `routes/index.js`). `match` tests `pathname` and `req.method`; `handler` receives `{ req, res, url, pathname, searchParams, session }`. Read the body with `readJson(req)` and reply with `sendJson(res, status, payload)`. Use `notAllowed(res)` for 403.
 2. Check the session, the permission and CSRF (`requireCsrf`, which compares the `X-CSRF-Token` header to the session token with a timing-safe comparison).
 3. Validate and normalize input on the server.
 4. Call a `lib/db.js` function.
 5. Call `incrementLedgerVersion()` after a successful mutation. GET responses for supplier, booster, expenses and raid-notes use `ledgerVersion` as an ETag and return 304 when it is unchanged, so a missed bump means clients keep showing stale data.
-6. Import the new db function in the big import block at the top of `server.js`.
+6. Import the new db function from `../../db.js` at the top of that routes file.
 7. On the client, call it through a `use*Actions` hook with `api(path, { method, body: JSON.stringify(...) }, csrfToken)`.
 
-**Changing persistence (`lib/db.js`)**
+**Changing persistence (`lib/db/`)**
 - Implement **both** branches: `if (isPostgres()) { ...pg client... } else { readFileDb(); mutate; writeFileDb(db) }`.
-- New column: add it to the `CREATE TABLE` **and** add `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `initDb()` so existing Railway databases migrate. Map snake_case to camelCase in the `map*FromRow` function. Add the default to `defaultDb` and the array guard in `readFileDb()` if a new collection is added.
+- Schema changes go in a **new migration** at the end of `MIGRATIONS` in `lib/migrations.js` (never edit an applied one). Keep them additive; check existing rows before adding a constraint (see `addCheckIfClean`). New tables in a migration only; new columns can also go in the migration with `ADD COLUMN IF NOT EXISTS`. Map snake_case to camelCase in the `map*FromRow` function. Add the default to `defaultDb` and the array guard in `readFileDb()` if a new collection is added.
 - Use `BEGIN`/`COMMIT`/`ROLLBACK` for multi-row operations (for example mark-paid, settle, batch reopen).
+- `payment_batch_id` / `booster_payment_batch_id` reference `payment_batches(id)`. Before writing a batch id in Postgres, call `ensurePaymentBatch(client, id, session)` (lib/db/core.js).
+- Default dates: use `bangkokToday()`, never `new Date().toISOString().slice(0, 10)` (that is the UTC date).
 - Keep persisted shapes backward compatible. `data/database.json` and production Postgres hold real ledger data.
 
 **Money and business rules**
@@ -131,14 +148,17 @@ A new privileged route needs both a server-side permission check and `requireCsr
 
 ## Tests
 
+- `npm test` loads `test/setup.js` first: it points `TEST_DB_PATH` at a fresh temp file, removes `DATABASE_URL`, and stops `.env` from loading, so tests can never touch `data/database.json` or a real database. Run a single file with `node --test --import ./test/setup.js test/<file>.test.js`.
+- To run the Postgres tests too, set `TEST_DATABASE_URL` to a **throwaway** database (it is used as `DATABASE_URL`). `test/migrations.test.js` drops and recreates migration tables there.
 - Node server tests set `NODE_ENV=test`, `TEST_DB_PATH=<tmp json>` and `SESSION_SECRET` **before** `await import("../server.js")`. They listen on port 0 and forge a signed session cookie (see `test/serverGateway.test.js`). Copy that setup. Do not touch `data/database.json` in tests.
 - Known failure on main as of Nov 2026: `RaidNotesPage.test.jsx` › "copies individual buyer name to clipboard". It predates the nav/colour refactor.
-- `test/postgresIntegration.test.js` skips itself unless `DATABASE_URL` is set. Do not point it at production.
+- `test/postgresIntegration.test.js` and `test/migrations.test.js` skip themselves unless `TEST_DATABASE_URL` is set. Never point it at production.
 - Put UI tests next to their component as `*.test.jsx`. Setup is in `src/vitest.setup.js` (jest-dom, cleanup).
 
 ## Gotchas
 
-- `server.js` runs `await initDb()` at the top level when it is imported, and starts listening unless `NODE_ENV=test`.
+- `server.js` runs `await initDb()` at the top level when it is imported (on Postgres this also applies pending migrations), and starts listening unless `NODE_ENV=test`.
+- A corrupt `data/database.json` now makes reads and writes fail loudly (code `LEDGER_FILE_CORRUPT`) instead of silently starting an empty ledger. Restore the file; the app never overwrites it.
 - Sessions live in an in-memory Map and in the database (the Postgres `sessions` table or the JSON file). A 15-minute interval prunes expired ones.
 - Rate limits are in memory per IP: auth 30/min, mutations 120/min.
 - `.env` and `data/database.json` hold secrets and real data. Never print, commit or send them to the browser.

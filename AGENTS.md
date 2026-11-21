@@ -11,7 +11,7 @@
 - `src/components/` owns React rendering and local interaction state.
 - `src/api.js` owns browser-to-server HTTP calls and client-facing error mapping. Do not fetch application endpoints directly from components.
 - `src/utils/` and `lib/` own reusable pure logic. Prefer pure functions when business rules can be separated from rendering or I/O.
-- `server.js` owns static serving, Discord OAuth, sessions, authorization, persistence orchestration, and server-side endpoints. Keep frontend code out of it.
+- `server.js` and `lib/server/` own static serving, Discord OAuth, sessions, authorization, persistence orchestration, and server-side endpoints (`lib/server/routes/`). Keep frontend code out of them.
 - `test/*.test.js` contains Node test-runner coverage. Colocate Vitest UI tests with their components as `*.test.jsx`.
 
 ## Working agreements
@@ -26,7 +26,7 @@
 
 ## Verification
 
-- Run `npm run check` after changing `server.js`.
+- Run `npm run check` after changing `server.js`, and `npm test` after changing anything in `server.js` or `lib/server/`.
 - Run `npm test` after changing `server.js`, `lib/`, Node utilities, persistence, or business rules.
 - Run `npm run test:ui` after changing React components, UI utilities, or browser behavior.
 - Run `npm run build` after changing frontend source or build configuration.
